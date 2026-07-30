@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install tooling
+        run: pip install ruff
+      - name: Lint
+        run: ruff check . || true
+      # Module 11 adds: docker build, Trivy scan, SBOM (syft), cosign sign,
+      # and push to GHCR. Kept minimal until there is something to build.

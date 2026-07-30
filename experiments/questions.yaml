@@ -1,0 +1,27 @@
+# Fixed question set used to measure semantic-cache hit rate AND to prove that
+# caching did not change the answers. Written before any caching exists, so the
+# benchmark cannot be tuned to flatter the result.
+#
+# Aim for ~100 entries across these groups. Paraphrase pairs matter most: they
+# are what a semantic cache should collapse and an exact-match cache should not.
+version: 1
+groups:
+  - name: paraphrase-pairs
+    note: near-identical intent, different wording - the cache SHOULD hit
+    items:
+      - id: p001a
+        q: "What does a %GR&R of 18% mean for this gauge?"
+      - id: p001b
+        q: "Is 18 percent gauge R and R acceptable?"
+  - name: distinct
+    note: superficially similar, materially different - the cache MUST NOT hit
+    items:
+      - id: d001
+        q: "What does a %GR&R of 18% mean for this gauge?"
+      - id: d002
+        q: "What does an ndc of 18 mean for this gauge?"
+  - name: tenant-specific
+    note: contains tenant measurements - must never be cached across tenants
+    items:
+      - id: t001
+        q: "Why did line 3 drift out of control at 14:20 today?"
