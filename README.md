@@ -1,6 +1,6 @@
 <div align="center">
 
-# tenantplane
+# Multi-tenant SaaS on Kubernetes
 
 ### A cost- and SLO-aware multi-tenant control plane for LLM-backed applications on Kubernetes.
 
@@ -61,7 +61,7 @@ Five stages in the request path, and deliberately nothing else:
 
 Regenerated from raw run data by `make report`. Empty until the experiment campaign runs.
 
-| Metric | Baseline (one deployment per tenant) | tenantplane |
+| Metric | Baseline (one deployment per tenant) | With the control plane |
 | --- | --- | --- |
 | ₹ per tenant per month | _pending_ | _pending_ |
 | Idle cost per tenant | _pending_ | _pending_ |

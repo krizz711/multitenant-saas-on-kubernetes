@@ -1,4 +1,4 @@
-CLUSTER ?= tenantplane
+CLUSTER ?= multitenant
 TENANTS ?= 3
 
 .PHONY: help up down load experiment report lint
