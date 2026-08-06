@@ -1,3 +1,10 @@
 * text=auto eol=lf
 Makefile text eol=lf
 *.png binary
+
+# GitHub's language bar (Linguist). Without these, Helm chart YAML and the
+# Kubernetes manifests outweigh the Python and the repo reads as a YAML project.
+deploy/charts/**   linguist-vendored
+deploy/k8s/**      linguist-documentation
+docs/**            linguist-documentation
+*.tf               linguist-detectable
