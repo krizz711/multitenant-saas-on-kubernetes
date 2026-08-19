@@ -1,7 +1,7 @@
 CLUSTER ?= multitenant
 TENANTS ?= 3
 
-.PHONY: help up down load experiment report lint
+.PHONY: help up down load experiment report lint build test
 
 help:
 	@echo "up          create the k3d cluster and install the platform"
@@ -26,4 +26,11 @@ down:
 	k3d cluster delete $(CLUSTER) || true
 
 lint:
-	python -m ruff check . || true
+	gofmt -l .
+	go vet ./...
+
+build:
+	go build ./...
+
+test:
+	go test ./...
