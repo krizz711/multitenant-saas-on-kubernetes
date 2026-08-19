@@ -22,8 +22,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/admission"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/job"
 	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/model"
 	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/obs"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/queue"
 )
 
 func main() {
@@ -35,9 +37,21 @@ func main() {
 		envDuration("MODEL_JITTER", 80*time.Millisecond),
 	)
 
+	// The queue client is built even if Redis is unreachable. Dialling is
+	// lazy, so an API pod that starts before Redis is ready comes up and
+	// serves /summary and /ask; only /analyze fails, and it fails with a 503
+	// that says so. Refusing to start would take out two working endpoints
+	// because a third one's dependency was slow.
+	q, err := queue.NewRedis(envString("REDIS_URL", "redis://localhost:6379/0"))
+	if err != nil {
+		log.Error("redis url", "err", err)
+		os.Exit(1)
+	}
+	defer func() { _ = q.Close() }()
+
 	srv := &http.Server{
 		Addr:    ":" + envString("PORT", "8000"),
-		Handler: routes(llm, log),
+		Handler: routes(llm, q, log),
 
 		// A read timeout bounds how long a slow client can hold a connection.
 		// Without it a handful of stalled connections can pin a pod open that
@@ -80,10 +94,11 @@ func main() {
 // Inside, admission wraps obs, never the other way round: obs labels its
 // histogram from the tenant and class that admission puts on the context, so
 // reversing them silently labels every metric "unknown".
-func routes(llm model.Client, log *slog.Logger) http.Handler {
+func routes(llm model.Client, q *queue.Redis, log *slog.Logger) http.Handler {
 	app := http.NewServeMux()
 	app.HandleFunc("GET /summary", handleSummary)
 	app.HandleFunc("POST /ask", handleAsk(llm, log))
+	app.HandleFunc("POST /analyze", handleAnalyze(q, log))
 
 	root := http.NewServeMux()
 	root.Handle("GET /metrics", promhttp.Handler())
@@ -141,6 +156,61 @@ func handleAsk(llm model.Client, log *slog.Logger) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, answer)
+	}
+}
+
+// handleAnalyze is the deferrable path. It does no work: it writes a job to
+// the tenant's queue and returns 202 immediately.
+//
+// Returning before the work happens is the point. It is what lets the worker
+// be scaled to zero independently of the API, and it is why the queue depth -
+// not CPU - is the signal KEDA scales on.
+func handleAnalyze(q *queue.Redis, log *slog.Logger) http.HandlerFunc {
+	type request struct {
+		Size int `json:"size"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req request
+		// An empty body is allowed: size is optional and has a default.
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&req); err != nil && err.Error() != "EOF" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body must be {\"size\": n} or empty"})
+			return
+		}
+		if req.Size <= 0 {
+			req.Size = job.DefaultSize
+		}
+		if req.Size > job.MaxSize {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "size too large", "max": job.MaxSize})
+			return
+		}
+
+		tenant := admission.Tenant(r.Context())
+		j := queue.Job{
+			ID:       queue.NewID(),
+			Tenant:   tenant,
+			Size:     req.Size,
+			Seed:     time.Now().UnixNano(),
+			Enqueued: time.Now().UTC(),
+		}
+
+		if err := q.Enqueue(r.Context(), j); err != nil {
+			log.Error("enqueue failed", "tenant", tenant, "err", err)
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "queue unavailable"})
+			return
+		}
+
+		depth, err := q.Depth(r.Context(), tenant)
+		if err != nil {
+			depth = -1 // reporting it is a convenience, not worth failing over
+		}
+
+		writeJSON(w, http.StatusAccepted, map[string]any{
+			"job_id":      j.ID,
+			"tenant":      tenant,
+			"size":        j.Size,
+			"queue_depth": depth,
+		})
 	}
 }
 
