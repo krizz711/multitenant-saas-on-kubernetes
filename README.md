@@ -74,30 +74,56 @@ Regenerated from raw run data by `make report`. Empty until the experiment campa
 ## Repository layout
 
 ```text
-workload/          the demonstration application - deliberately small, frozen once it works
-  api/             FastAPI: /summary (cheap read), /ask (LLM), /analyze (enqueue)
-  worker/          queue consumer running a CPU-bound job of tunable size
-controlplane/      the actual deliverable
-  admission.py     tenant id + latency-class tagging middleware
-  gateway/         token budget, semantic cache, prompt coalescing
-  costmeter/       PromQL recording rules -> rupees per tenant
-  scaler/          KEDA ScaledObjects and HTTP add-on configuration
+workload/            the demonstration application - deliberately small, frozen, replaceable
+  api/               Go: /summary (cheap read), /ask (model call), /analyze (enqueue -> 202)
+  worker/            queue consumer, one per tenant, blocks rather than polls
+  analysis/          the domain-specific surface - CPU-bound work of tunable size, swappable
+controlplane/        the actual deliverable - application-agnostic
+  admission/         tenant id + latency-class tagging middleware
+  queue/             one Redis list per tenant; the key KEDA scales on
+  model/             the only boundary to the language model
+  obs/               histograms whose buckets put the SLO on an exact edge
+  gateway/           token budget, semantic cache, prompt coalescing        (Module 7)
+  scaler/            KEDA ScaledObjects and HTTP add-on configuration       (Module 6)
+  costmeter/         PromQL recording rules -> rupees per tenant            (Module 9)
 deploy/
-  charts/          Helm chart, one release per tenant
-  k8s/             PriorityClasses, ResourceQuotas, NetworkPolicies
-  terraform/       free-tier VM + k3s bootstrap
-  argocd/          Application definitions
+  charts/            Helm chart, one release per tenant
+  k8s/               PriorityClasses, ResourceQuotas, NetworkPolicies
+  terraform/         free-tier VM + k3s bootstrap
+  argocd/            Application definitions
 experiments/
-  tenants.py       tenant population and shift-shaped load model
-  questions.yaml   fixed question set used to validate cache answer quality
-  run.py           configuration x repeat runner (E1-E7)
-  raw/             committed raw run output - the evidence behind every figure
-  figures.py       regenerates every figure from raw/
+  tenants.py         tenant population and shift-shaped load model
+  questions.yaml     fixed question set used to validate cache answer quality
+  run.py             configuration x repeat runner (E1-E7)
+  raw/               committed raw run output - the evidence behind every figure
+  figures.py         regenerates every figure from raw/
 ```
+
+### Swapping the workload
+
+`workload/` is a stand-in, not a commitment. It computes a gauge repeatability-and-reproducibility
+study because that is the analysis which motivated this project, but any deterministic CPU-bound
+function of tunable size fills the same role, and any LLM-backed web application could take its
+place.
+
+That is only credible because the dependency runs one way: **nothing in `controlplane/` imports
+anything from `workload/`**, and `TestControlPlaneDoesNotImportWorkload` enforces it on every CI
+run rather than trusting a convention. To put a different application under the same control plane,
+satisfy three contracts:
+
+1. Send `X-Tenant` on every request, and list deferrable routes in `controlplane/admission`.
+2. Wrap handlers as `admission.Middleware(obs.Middleware(h))`, so latency is labelled by tenant
+   and latency class.
+3. Reach the model only through `controlplane/model.Client`, and enqueue deferrable work through
+   `controlplane/queue`.
+
+Because `controlplane/` sits outside Go's import-restricted `internal/` directory, another module
+can import it directly - the reusability claim is enforced by the compiler, not just asserted here.
+
 
 ## Running it
 
-Requires Docker, `kubectl`, `k3d`, `helm` and Python 3.12. Nothing in this project needs a cloud account or a
+Requires Docker, `kubectl`, `k3d`, `helm`, Go 1.25 and Python 3.12 (experiments only). Nothing in this project needs a cloud account or a
 payment method.
 
 ```bash

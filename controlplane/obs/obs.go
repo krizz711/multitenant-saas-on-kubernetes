@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/admission"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/admission"
 )
 
 // SLO is the tail-latency objective for interactive requests. It exists as a

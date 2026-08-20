@@ -6,7 +6,7 @@
 // batch work from delaying interactive work, and two processes can only
 // compete for a core if both are actually using one - a time.Sleep would
 // contend for nothing and the experiment would prove nothing.
-package job
+package analysis
 
 import "math"
 

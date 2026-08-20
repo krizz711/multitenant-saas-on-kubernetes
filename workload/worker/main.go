@@ -19,9 +19,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/job"
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/obs"
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/queue"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/obs"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/queue"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/workload/analysis"
 )
 
 func main() {
@@ -101,7 +101,7 @@ func drain(ctx context.Context, q *queue.Redis, tenant string, log *slog.Logger)
 		obs.JobQueueWait.WithLabelValues(tenant).Observe(time.Since(j.Enqueued).Seconds())
 
 		start := time.Now()
-		result := job.Run(j.Size, j.Seed)
+		result := analysis.Run(j.Size, j.Seed)
 		elapsed := time.Since(start)
 
 		obs.JobDuration.WithLabelValues(tenant).Observe(elapsed.Seconds())

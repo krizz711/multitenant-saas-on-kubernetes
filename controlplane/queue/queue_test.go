@@ -8,7 +8,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/queue"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/queue"
 )
 
 // newTestQueue runs Redis in-process. The alternative - requiring a container

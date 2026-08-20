@@ -1,25 +1,25 @@
-package job_test
+package analysis_test
 
 import (
 	"testing"
 
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/job"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/workload/analysis"
 )
 
 func TestRunIsDeterministic(t *testing.T) {
 	// Same seed, same answer. Every experiment in this project is a comparison
 	// between two runs, so a workload that varied run to run would make the
 	// difference between configurations impossible to separate from noise.
-	a := job.Run(500, 42)
-	b := job.Run(500, 42)
+	a := analysis.Run(500, 42)
+	b := analysis.Run(500, 42)
 	if a != b {
 		t.Fatalf("same seed gave different results:\n %+v\n %+v", a, b)
 	}
 }
 
 func TestDifferentSeedsGiveDifferentData(t *testing.T) {
-	a := job.Run(500, 1)
-	b := job.Run(500, 2)
+	a := analysis.Run(500, 1)
+	b := analysis.Run(500, 2)
 	if a == b {
 		t.Fatal("different seeds produced identical results; the seed is being ignored")
 	}
@@ -27,13 +27,13 @@ func TestDifferentSeedsGiveDifferentData(t *testing.T) {
 
 func TestMeasurementCountScalesWithSize(t *testing.T) {
 	// 3 operators x 3 trials per part.
-	if got := job.Run(100, 1).Measurements; got != 900 {
+	if got := analysis.Run(100, 1).Measurements; got != 900 {
 		t.Fatalf("measurements = %d, want 900", got)
 	}
 }
 
 func TestVarianceComponentsArePlausible(t *testing.T) {
-	r := job.Run(2000, 7)
+	r := analysis.Run(2000, 7)
 
 	if r.Repeatability <= 0 {
 		t.Errorf("repeatability = %f, want > 0", r.Repeatability)
@@ -53,6 +53,6 @@ func TestVarianceComponentsArePlausible(t *testing.T) {
 
 func BenchmarkRun(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		job.Run(job.DefaultSize, int64(i))
+		analysis.Run(analysis.DefaultSize, int64(i))
 	}
 }

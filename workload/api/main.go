@@ -21,11 +21,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/admission"
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/job"
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/model"
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/obs"
-	"github.com/krizz711/multitenant-saas-on-kubernetes/internal/queue"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/admission"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/model"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/obs"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/queue"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/workload/analysis"
 )
 
 func main() {
@@ -178,10 +178,10 @@ func handleAnalyze(q *queue.Redis, log *slog.Logger) http.HandlerFunc {
 			return
 		}
 		if req.Size <= 0 {
-			req.Size = job.DefaultSize
+			req.Size = analysis.DefaultSize
 		}
-		if req.Size > job.MaxSize {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "size too large", "max": job.MaxSize})
+		if req.Size > analysis.MaxSize {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "size too large", "max": analysis.MaxSize})
 			return
 		}
 
