@@ -86,7 +86,7 @@ func drain(ctx context.Context, q *queue.Redis, tenant string, log *slog.Logger)
 			return
 		case err != nil:
 			log.Error("dequeue failed", "tenant", tenant, "err", err)
-			obs.JobsProcessed.WithLabelValues(tenant, "error").Inc()
+			obs.QueueErrors.WithLabelValues(tenant).Inc()
 
 			// Back off rather than spinning: if Redis is down, a tight retry
 			// loop turns one outage into a busy loop on every worker at once.

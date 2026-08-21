@@ -1,0 +1,13 @@
+# Keep the build context small: everything here is either irrelevant to a
+# compile or actively harmful to ship.
+.git
+.github
+*.md
+paper/
+docs/
+experiments/raw/
+deploy/
+.env
+.env.*
+kubeconfig
+*.kubeconfig

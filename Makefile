@@ -1,11 +1,13 @@
 CLUSTER ?= multitenant
 TENANTS ?= 3
 
-.PHONY: help up down load experiment report lint build test kubeconfig
+.PHONY: help up down load experiment report lint build test kubeconfig images deploy
 
 help:
 	@echo "up          create the k3d cluster and install the platform"
 	@echo "kubeconfig  repoint kubectl at the cluster API server (run after any recreate)"
+	@echo "images      build both container images and side-load them into the cluster"
+	@echo "deploy      apply the manifests and wait for every rollout"
 	@echo "load        drive the shift-shaped multi-tenant workload"
 	@echo "experiment  run the E1-E7 matrix into experiments/raw/"
 	@echo "report      regenerate every figure from experiments/raw/"
@@ -25,6 +27,18 @@ up:
 # from Docker rather than hard-coding it.
 kubeconfig:
 	kubectl config set-cluster k3d-$(CLUSTER) --server=https://127.0.0.1:$$(docker port k3d-$(CLUSTER)-serverlb 6443/tcp | head -1 | cut -d: -f2)
+
+images:
+	docker build --build-arg TARGET=api    -t multitenant/api:dev .
+	docker build --build-arg TARGET=worker -t multitenant/worker:dev .
+	k3d image import multitenant/api:dev multitenant/worker:dev -c $(CLUSTER)
+
+deploy: images
+	kubectl apply -f deploy/k8s/platform/redis.yaml
+	kubectl apply -f deploy/k8s/tenant-a/
+	kubectl -n platform rollout status deploy/redis  --timeout=120s
+	kubectl -n tenant-a rollout status deploy/api    --timeout=120s
+	kubectl -n tenant-a rollout status deploy/worker --timeout=120s
 
 load:
 	@echo "TODO (module 5): locust -f experiments/tenants.py"

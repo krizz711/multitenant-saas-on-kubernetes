@@ -1,0 +1,35 @@
+# The worker serves exactly one tenant, named by TENANT. That is the whole
+# reason it is a separate Deployment: KEDA can take this one to zero in
+# Module 6 without touching any other tenant's workers, which is claim C1.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: tenant-a
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: worker }
+  template:
+    metadata:
+      labels:
+        app: worker
+        tenant: tenant-a
+    spec:
+      containers:
+        - name: worker
+          image: multitenant/worker:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          env:
+            - name: TENANT
+              value: tenant-a
+            - name: REDIS_URL
+              value: redis://redis.platform.svc.cluster.local:6379/0
+          # A deliberately generous CPU limit: the job is meant to be able to
+          # saturate a core, because claim C3 is about what happens when it
+          # competes with an interactive request for one.
+          resources:
+            requests: { cpu: 200m, memory: 64Mi }
+            limits:   { cpu: 1000m, memory: 256Mi }

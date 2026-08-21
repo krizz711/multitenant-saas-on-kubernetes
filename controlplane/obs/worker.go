@@ -45,3 +45,20 @@ var JobsProcessed = promauto.NewCounterVec(
 	},
 	[]string{"tenant", "outcome"},
 )
+
+// QueueErrors counts failures to *read* the queue, which are deliberately not
+// counted as job failures.
+//
+// The distinction is not pedantic. A worker that starts before Redis is ready
+// logs several dial failures before recovering - normal, expected, and nobody
+// is harmed. Counting those as failed jobs would inflate the error rate that
+// claims C1 and C3 are judged against with pure startup noise, and would do it
+// most severely in exactly the scale-from-zero scenario C1 is about, where
+// workers start cold all the time.
+var QueueErrors = promauto.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "queue_read_errors_total",
+		Help: "Failures to read from the queue. Not job failures; a cold worker produces these until its dependency is ready.",
+	},
+	[]string{"tenant"},
+)
