@@ -1,0 +1,52 @@
+# Values for kube-prometheus-stack, trimmed for a laptop cluster.
+#
+# Two settings here are not tuning - they are the difference between this
+# working and appearing to work.
+
+prometheus:
+  prometheusSpec:
+    # TRAP 1. By default the Prometheus Operator only discovers ServiceMonitors
+    # and PodMonitors that carry its own Helm release label. Ours do not, so it
+    # would silently ignore them: no error, no warning, the application targets
+    # simply never appear and every query returns nothing. Setting these to
+    # false makes the operator discover monitors across the whole cluster.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    # Experiments are minutes long, not weeks. Long retention on a laptop buys
+    # nothing and costs disk.
+    retention: 12h
+
+    resources:
+      requests: { cpu: 100m, memory: 400Mi }
+      limits:   { cpu: "1",  memory: 1Gi }
+
+grafana:
+  enabled: true
+  # Local-only cluster reached through kubectl port-forward, never exposed.
+  # A real deployment would take this from a Secret.
+  adminPassword: admin
+  service:
+    type: ClusterIP
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 300m, memory: 256Mi }
+
+# Not needed: this project measures and attributes cost, it does not page anyone.
+alertmanager:
+  enabled: false
+
+# TRAP 2. k3s runs the control plane as a single embedded process and does not
+# expose these components on the separate ports a kubeadm cluster does. Left
+# enabled, they show up as permanently-down scrape targets, which makes the
+# target page look broken and trains you to ignore red - exactly the wrong
+# habit when a real target goes down.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false

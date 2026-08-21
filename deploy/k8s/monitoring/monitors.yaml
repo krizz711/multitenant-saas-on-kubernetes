@@ -1,0 +1,47 @@
+# Tells Prometheus what to scrape. Two different objects for two different
+# situations, which is the point worth learning here.
+
+# The API sits behind a Service, so a ServiceMonitor selects it. Scraping
+# through the Service means new replicas are picked up automatically as the
+# Deployment scales - which matters once KEDA is driving that scaling.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tenant-api
+  namespace: monitoring
+spec:
+  # namespaceSelector accepts only `any` or an explicit `matchNames` list -
+  # it cannot select namespaces by label. `any: true` plus the app label below
+  # is what keeps this tenant-agnostic: adding a tenant in Module 4 requires no
+  # edit here, whereas matchNames would need one per customer.
+  namespaceSelector:
+    any: true
+  selector:
+    matchLabels:
+      app: api
+  endpoints:
+    - port: http
+      path: /metrics
+      # 15s rather than the 30s default. Cold starts and scale-to-zero events
+      # last seconds, and a 30s interval would sample straight past the
+      # transient that claim C1 is entirely about.
+      interval: 15s
+---
+# The worker has no Service - nothing calls it, it pulls from a queue - so a
+# ServiceMonitor has nothing to select. A PodMonitor scrapes pods directly,
+# which is the right tool for a queue consumer.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: tenant-worker
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    any: true
+  selector:
+    matchLabels:
+      app: worker
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

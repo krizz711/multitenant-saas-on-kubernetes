@@ -6,6 +6,9 @@ metadata:
   name: tenant-a
   labels:
     tenant: tenant-a
+    # The monitors select namespaces by this label rather than by name, so
+    # onboarding a tenant in Module 4 needs no edit to the monitoring config.
+    tenant-namespace: "true"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -58,8 +61,17 @@ kind: Service
 metadata:
   name: api
   namespace: tenant-a
+  # These labels are what the ServiceMonitor selects on. A ServiceMonitor
+  # matches the Service's OWN labels - not spec.selector, which only says which
+  # pods to route to. Omitting them is silent: the Service works perfectly, the
+  # pods are healthy, and the scrape target simply never appears.
+  labels:
+    app: api
+    tenant: tenant-a
 spec:
   selector: { app: api }
   ports:
-    - port: 8000
+    # Named because a ServiceMonitor selects the port by name, not by number.
+    - name: http
+      port: 8000
       targetPort: http

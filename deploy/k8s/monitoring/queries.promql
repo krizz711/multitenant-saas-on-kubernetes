@@ -1,0 +1,59 @@
+# The queries this project's results are built from.
+#
+# Kept in the repository because a number in a paper that cannot be reproduced
+# from a stated query is not evidence. Every figure should name the query that
+# produced it. Baselines recorded 21 Aug 2026 on a 3-node k3d cluster, single
+# tenant, no control-plane features active yet - these are the "before" column
+# every later claim is measured against.
+
+# --- Interactive latency -----------------------------------------------------
+
+# p95 latency per route. THE number for the SLO.
+# The rate() inside is required: histogram buckets are counters, and
+# histogram_quantile over raw counters gives the all-time percentile rather
+# than the recent one. Baseline: /summary 9.5 ms, /ask 195 ms.
+histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket{class="interactive"}[5m])))
+
+# Same, split per tenant. This is the form used for claim C3: one tenant's
+# batch load must not move another tenant's p95.
+histogram_quantile(0.95, sum by (le, tenant) (rate(http_request_duration_seconds_bucket{class="interactive"}[5m])))
+
+# SLO compliance: the fraction of interactive requests served under 400 ms.
+# This is an exact ratio of counters rather than an interpolated quantile,
+# which is only possible because 0.4 is a real bucket boundary. Baseline: 1.0.
+sum(rate(http_request_duration_seconds_bucket{class="interactive",le="0.4"}[5m]))
+  /
+sum(rate(http_request_duration_seconds_count{class="interactive"}[5m]))
+
+# --- Deferrable work ---------------------------------------------------------
+
+# How long a job took once it started. Expected to get WORSE under claim C3:
+# that is the trade being made, and hiding it would be dishonest.
+# Baseline: 438 ms p95.
+histogram_quantile(0.95, sum by (le, tenant) (rate(job_duration_seconds_bucket[5m])))
+
+# How long a job waited before a worker took it. THE number for claim C1:
+# when KEDA has scaled a tenant's workers to zero, the first job of the day
+# pays the cold start here, not in job_duration. Baseline: 850 ms p95 with a
+# warm worker - the figure a cold start must be compared against.
+histogram_quantile(0.95, sum by (le, tenant) (rate(job_queue_wait_seconds_bucket[5m])))
+
+# Queue depth is what KEDA scales on. Not yet exported to Prometheus - Module 6
+# adds a Redis exporter - but LLEN q:<tenant> is the same value.
+
+# Job outcomes. Queue read errors are deliberately a separate metric
+# (queue_read_errors_total) so that a cold worker's startup retries cannot be
+# mistaken for failed work.
+sum by (tenant, outcome) (rate(jobs_processed_total[5m]))
+
+# --- Cost attribution (raw material for Module 9) ----------------------------
+
+# CPU seconds per tenant namespace. Multiplied by a rupee rate this becomes the
+# compute term of the per-tenant bill. Baseline: 0.0067 cores idle-ish.
+sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=~"tenant-.*"}[5m]))
+
+# Memory per tenant namespace - the second term.
+sum by (namespace) (container_memory_working_set_bytes{namespace=~"tenant-.*"})
+
+# Tokens per tenant will be the third term, once the Module 7 gateway exports
+# it. Cost = CPU-seconds x rate + GB-months x rate + tokens x published price.
