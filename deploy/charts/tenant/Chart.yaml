@@ -1,0 +1,10 @@
+apiVersion: v2
+name: tenant
+description: >-
+  Everything one customer needs, as a single release. Onboarding a tenant is
+  `helm install <name> deploy/charts/tenant --set tenant=<name>`, and
+  offboarding is `helm uninstall <name>` - which deletes the namespace and
+  cascades to every object inside it.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,30 @@
+# One worker Deployment per tenant, so KEDA can take this tenant's workers to
+# zero in Module 6 without touching anyone else's. A shared worker pool could
+# never reach zero for any individual customer.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: {{ .Values.tenant }}
+  labels: { app: worker, tenant: {{ .Values.tenant }} }
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels: { app: worker }
+  template:
+    metadata:
+      labels:
+        app: worker
+        tenant: {{ .Values.tenant }}
+        tier: {{ .Values.tier }}
+    spec:
+      containers:
+        - name: worker
+          image: {{ .Values.images.worker }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          env:
+            - { name: TENANT,    value: {{ .Values.tenant | quote }} }
+            - { name: REDIS_URL, value: {{ .Values.redisUrl | quote }} }
+          resources: {{- toYaml .Values.worker.resources | nindent 12 }}

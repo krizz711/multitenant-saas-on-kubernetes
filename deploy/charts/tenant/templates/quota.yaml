@@ -1,0 +1,33 @@
+{{- $q := index .Values.quota .Values.tier -}}
+# The ceiling on what this customer may consume, summed across the namespace.
+#
+# Note it caps requests AND limits separately. Capping only limits would let a
+# tenant reserve the whole node with requests it never uses; capping only
+# requests would let them burst over the top of everyone else.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: {{ .Values.tenant }}
+spec:
+  hard:
+    requests.cpu: {{ $q.requestsCpu | quote }}
+    limits.cpu: {{ $q.limitsCpu | quote }}
+    requests.memory: {{ $q.requestsMemory | quote }}
+    limits.memory: {{ $q.limitsMemory | quote }}
+    pods: {{ $q.pods | quote }}
+---
+# Once a ResourceQuota names CPU or memory, every pod in the namespace MUST
+# declare requests and limits or it is rejected outright. A LimitRange supplies
+# defaults so a pod that forgets is given sensible values instead of failing to
+# schedule with an error that never mentions the quota.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tenant-defaults
+  namespace: {{ .Values.tenant }}
+spec:
+  limits:
+    - type: Container
+      default:        { cpu: 200m, memory: 128Mi }
+      defaultRequest: { cpu: 50m,  memory: 64Mi }

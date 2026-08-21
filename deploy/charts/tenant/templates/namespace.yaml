@@ -1,0 +1,14 @@
+# The namespace IS the tenant boundary. Quotas, network rules and secrets all
+# attach here, and deleting it garbage-collects everything inside - which makes
+# `helm uninstall` a complete, one-command offboarding.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.tenant }}
+  labels:
+    tenant: {{ .Values.tenant }}
+    tier: {{ .Values.tier }}
+    # Selected by NetworkPolicy in other namespaces. Namespace selectors match
+    # namespace LABELS, never names, so this label is what makes cross-tenant
+    # rules expressible at all.
+    tenant-namespace: "true"

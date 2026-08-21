@@ -1,0 +1,46 @@
+# Defaults for one tenant. Every install overrides `tenant`, and the tier
+# controls how much of the cluster that customer may consume.
+tenant: tenant-a
+
+# tier drives the quota and, from Module 8, the priority class. Modelling
+# tiers now is what makes the cost-per-tenant result interesting later:
+# a premium tenant costs more to serve, and the meter should show it.
+tier: standard
+
+images:
+  api: multitenant/api:dev
+  worker: multitenant/worker:dev
+  pullPolicy: IfNotPresent
+
+redisUrl: redis://redis.platform.svc.cluster.local:6379/0
+
+api:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+
+worker:
+  replicas: 1
+  resources:
+    requests: { cpu: 200m, memory: 64Mi }
+    # Deliberately generous: the job must be able to saturate a core, because
+    # claim C3 is about what happens when it competes for one.
+    limits:   { cpu: "1", memory: 256Mi }
+
+# The ceiling on everything this customer can ask for, summed across the
+# namespace. This is the mechanism that stops one tenant consuming the cluster
+# - the "no tenant has a ceiling" half of problem P2, applied to CPU.
+quota:
+  standard:
+    requestsCpu: "1"
+    limitsCpu: "2"
+    requestsMemory: 512Mi
+    limitsMemory: 1Gi
+    pods: "8"
+  premium:
+    requestsCpu: "2"
+    limitsCpu: "4"
+    requestsMemory: 1Gi
+    limitsMemory: 2Gi
+    pods: "16"

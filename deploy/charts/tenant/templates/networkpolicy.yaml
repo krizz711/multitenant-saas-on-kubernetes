@@ -1,0 +1,46 @@
+# Default deny: once any NetworkPolicy selects a pod, everything not explicitly
+# allowed is refused. This is what stops tenant A reaching tenant B.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ .Values.tenant }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# Allow this tenant's own pods to talk to each other.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-tenant
+  namespace: {{ .Values.tenant }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              tenant: {{ .Values.tenant }}
+---
+# Allow Prometheus to scrape.
+#
+# This rule is not optional and it is the one everybody forgets. A default-deny
+# policy silently blocks the monitoring namespace, every scrape target goes
+# down, and the dashboards empty out with no error anywhere near the cause. The
+# lesson generalises: locking down a namespace breaks your own observability
+# first.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: {{ .Values.tenant }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
