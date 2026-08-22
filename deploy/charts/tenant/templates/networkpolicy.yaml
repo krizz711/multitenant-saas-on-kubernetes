@@ -44,3 +44,24 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
+---
+# Allow the ingress controller in.
+#
+# default-deny blocks Traefik exactly as it blocks another tenant - it lives in
+# kube-system, which is not this namespace. Without this rule every request
+# through the ingress returns 502 while the pods sit perfectly healthy, which
+# is the same class of self-inflicted outage as blocking Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller
+  namespace: {{ .Values.tenant }}
+spec:
+  podSelector:
+    matchLabels: { app: api }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system

@@ -1,0 +1,27 @@
+# Routing by Host header is how a real multi-tenant SaaS separates customers at
+# the edge: one ingress controller, one IP, one certificate, and the hostname
+# decides whose namespace the request lands in.
+#
+# It also matters for the control plane specifically. Module 6 puts KEDA's HTTP
+# interceptor in this path so a request for a scaled-to-zero tenant is HELD
+# while its pods start, rather than refused. A port-forward straight to a pod
+# has no path to intercept, so the cold-start behaviour claim C1 measures could
+# not exist.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  namespace: {{ .Values.tenant }}
+  labels: { app: api, tenant: {{ .Values.tenant }} }
+spec:
+  rules:
+    - host: {{ .Values.tenant }}.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  name: http
