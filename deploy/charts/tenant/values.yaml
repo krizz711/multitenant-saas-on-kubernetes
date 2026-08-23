@@ -55,3 +55,20 @@ scaling:
   # templates/scaledobject.yaml. Production values would be far larger.
   pollingInterval: 5
   cooldownPeriod: 20
+
+# Token gateway (Module 7, claim C2).
+#
+# The budget is per tier because that is what a tier IS in a real SaaS: a
+# premium customer buys a bigger allowance. It also makes the cost meter in
+# Module 9 interesting - two tenants on different tiers should produce visibly
+# different bills.
+gateway:
+  tokenBudget:
+    standard: 50000
+    premium: 200000
+  # Chosen from the measured similarity distribution, not picked to flatter the
+  # hit rate. gateway_cache_similarity records every lookup's best score so the
+  # cut-off can be justified from data.
+  cacheThreshold: "0.90"
+  cacheMaxEntries: 200
+  cacheTTL: 24h

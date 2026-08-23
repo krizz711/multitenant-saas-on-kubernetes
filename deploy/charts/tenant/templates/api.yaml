@@ -24,6 +24,11 @@ spec:
           env:
             - { name: REDIS_URL, value: {{ .Values.redisUrl | quote }} }
             - { name: TENANT,    value: {{ .Values.tenant | quote }} }
+            - name: TOKEN_BUDGET
+              value: {{ index .Values.gateway.tokenBudget .Values.tier | quote }}
+            - { name: CACHE_THRESHOLD,   value: {{ .Values.gateway.cacheThreshold | quote }} }
+            - { name: CACHE_MAX_ENTRIES, value: {{ .Values.gateway.cacheMaxEntries | quote }} }
+            - { name: CACHE_TTL,         value: {{ .Values.gateway.cacheTTL | quote }} }
           resources: {{- toYaml .Values.api.resources | nindent 12 }}
           readinessProbe:
             httpGet: { path: /healthz, port: http }

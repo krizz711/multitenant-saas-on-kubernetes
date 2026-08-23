@@ -20,8 +20,10 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/admission"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/gateway"
 	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/model"
 	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/obs"
 	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/queue"
@@ -31,23 +33,40 @@ import (
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	llm := model.NewStub(
+	upstream := model.NewStub(
 		envInt64("MODEL_SEED", 1),
 		envDuration("MODEL_BASE_LATENCY", 120*time.Millisecond),
 		envDuration("MODEL_JITTER", 80*time.Millisecond),
 	)
 
-	// The queue client is built even if Redis is unreachable. Dialling is
-	// lazy, so an API pod that starts before Redis is ready comes up and
-	// serves /summary and /ask; only /analyze fails, and it fails with a 503
-	// that says so. Refusing to start would take out two working endpoints
-	// because a third one's dependency was slow.
-	q, err := queue.NewRedis(envString("REDIS_URL", "redis://localhost:6379/0"))
+	// One Redis client shared by the queue and the gateway. Dialling is lazy,
+	// so an API pod that starts before Redis is ready still comes up; the
+	// endpoints that need Redis fail with a 503 that says so rather than the
+	// pod refusing to start and taking the working endpoints down with it.
+	redisOpts, err := redis.ParseURL(envString("REDIS_URL", "redis://localhost:6379/0"))
 	if err != nil {
 		log.Error("redis url", "err", err)
 		os.Exit(1)
 	}
-	defer func() { _ = q.Close() }()
+	rdb := redis.NewClient(redisOpts)
+	defer func() { _ = rdb.Close() }()
+
+	q := queue.NewRedisClient(rdb)
+
+	// The gateway wraps the model rather than replacing it, and it satisfies
+	// model.Client, so handleAsk below is unchanged from Module 2. That is
+	// what the interface at that boundary was for.
+	llm := gateway.New(
+		upstream,
+		gateway.NewBudget(rdb, envInt64("TOKEN_BUDGET", 100_000), nil),
+		gateway.NewCache(
+			rdb,
+			gateway.LexicalEmbedder{},
+			envFloat("CACHE_THRESHOLD", 0.90),
+			envInt64("CACHE_MAX_ENTRIES", 200),
+			envDuration("CACHE_TTL", 24*time.Hour),
+		),
+	)
 
 	srv := &http.Server{
 		Addr:    ":" + envString("PORT", "8000"),
@@ -150,6 +169,15 @@ func handleAsk(llm model.Client, log *slog.Logger) http.HandlerFunc {
 			if errors.Is(err, context.Canceled) {
 				return
 			}
+			// Over budget is a policy outcome, not a failure. 429 tells the
+			// caller to slow down; a 502 would suggest the model broke and
+			// send them retrying into the same wall.
+			if errors.Is(err, gateway.ErrBudgetExceeded) {
+				writeJSON(w, http.StatusTooManyRequests, map[string]string{
+					"error": "token budget exhausted for this billing period",
+				})
+				return
+			}
 			log.Error("model call failed", "tenant", tenant, "err", err)
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "model unavailable"})
 			return
@@ -229,6 +257,13 @@ func envString(key, def string) string {
 
 func envInt64(key string, def int64) int64 {
 	if v, err := strconv.ParseInt(os.Getenv(key), 10, 64); err == nil {
+		return v
+	}
+	return def
+}
+
+func envFloat(key string, def float64) float64 {
+	if v, err := strconv.ParseFloat(os.Getenv(key), 64); err == nil {
 		return v
 	}
 	return def

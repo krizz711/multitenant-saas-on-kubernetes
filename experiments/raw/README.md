@@ -61,3 +61,48 @@ moves the bottleneck to a *tunable parameter* rather than a property of the
 workload, which is a much stronger position: the cold-start penalty is not a
 fixed cost of scale-to-zero, it is a cost the operator chooses by trading
 polling frequency against load on Redis.
+
+## e2-cache-similarity (2026-08-23) — claim C2, a negative result
+
+Cosine similarity under the local `lexical-hash-256` embedder, against the
+benchmark pairs in `experiments/questions.yaml`:
+
+| pair                                    | score | desired  |
+|-----------------------------------------|-------|----------|
+| identical text                          | 1.000 | hit      |
+| paraphrase (%GR&R 18% ↔ "18 percent gauge R and R acceptable?") | **0.219** | **hit**  |
+| distinct (%GR&R of 18 ↔ ndc of 18)      | **0.794** | **miss** |
+| unrelated (line 3 drift)                | 0.097 | miss     |
+
+**The lexical embedder ranks the distinct pair four times higher than the
+paraphrase pair.** No threshold can separate them: any cut-off low enough to
+catch the paraphrase at 0.219 would also merge the distinct pair at 0.794 and
+answer the wrong question.
+
+The cause is structural rather than a tuning problem. "What does a %GR&R of 18%
+mean for this gauge?" and "What does an ndc of 18 mean for this gauge?" share
+almost every word and differ in one term that carries the entire meaning. A
+bag-of-words vector cannot see that. Only an embedder trained on meaning can.
+
+### What this means for C2
+
+At the configured threshold of 0.90 the system is **safe but limited**: the
+distinct pair at 0.794 correctly misses, and the paraphrase at 0.219 also
+misses. In this configuration the cache serves only near-identical prompts.
+
+That is still a real saving, and it is the dominant one in the motivating
+system: its monitoring agent re-asks *the same* question every thirty seconds
+per series. Those are exact repeats, and they are caught. Prompt coalescing
+catches the concurrent case a cache cannot reach at all — 20 simultaneous
+identical prompts collapse to one upstream call.
+
+So C2 should be stated as two separate results rather than one:
+
+- **Supported now**: exact and near-exact repeat elimination, plus concurrent
+  coalescing, with no loss of answer quality and no cross-tenant leakage.
+- **Not supported by the local embedder**: paraphrase collapse. Claiming it
+  would require a semantic embedding model, which is future work with a stated
+  cost — a network call in the measurement path, and a rate-limited free tier.
+
+Reporting the 0.219/0.794 inversion is worth more than a flattering hit rate.
+It is measured, it is explained, and it names exactly what would fix it.
