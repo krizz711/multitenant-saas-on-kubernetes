@@ -15,6 +15,12 @@ spec:
         tenant: {{ .Values.tenant }}
         tier: {{ .Values.tier }}
     spec:
+      {{- if .Values.scheduling.enabled }}
+      priorityClassName: {{ .Values.scheduling.interactivePriorityClass }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: api
           image: {{ .Values.images.api }}

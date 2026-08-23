@@ -106,3 +106,58 @@ So C2 should be stated as two separate results rather than one:
 
 Reporting the 0.219/0.794 inversion is worth more than a flattering hit rate.
 It is measured, it is explained, and it names exactly what would fix it.
+
+## e3-noisy-neighbour (2026-08-23) — claim C3, partially supported
+
+tenant-a floods its deferrable queue; tenant-b, a different customer pinned to
+the SAME node, does nothing but cheap interactive reads. Victim workload is
+identical in all three phases; only tenant-a's behaviour and the scheduling
+configuration change.
+
+| phase       | n   | p50     | p95      | p99      | max     |
+|-------------|-----|---------|----------|----------|---------|
+| quiet       | 748 | 6.5 ms  | 26.9 ms  | 29.0 ms  | 103.7   |
+| unprotected | 529 | 28.6 ms | 75.2 ms  | 123.7 ms | 209.7   |
+| protected   | 546 | 28.0 ms | **61.4 ms** | **96.5 ms** | 189.4   |
+
+**Contention is real**: p95 degrades 2.8x from 26.9 ms to 75.2 ms when a
+neighbour floods the node. That is the noisy-neighbour problem, reproduced.
+
+**Protection helps, but does not restore the baseline**: p95 recovers 18%
+(75.2 → 61.4) and p99 recovers 22% (123.7 → 96.5). It does not return to
+26.9 ms. C3 as stated - "class separation HOLDS the interactive objective under
+heavy batch load" - is therefore only partially supported by this run. Both
+loaded phases stay under the 400 ms objective, but that is headroom, not the
+mechanism succeeding.
+
+### Three caveats that must not be dropped
+
+**1. The degradation is not cleanly attributable to worker CPU.** The flood
+reaches tenant-a through the same Traefik ingress the victim uses, and also
+loads tenant-a's own API pod. So the quiet→unprotected gap mixes node CPU
+contention with shared ingress and API load.
+
+The unprotected→protected comparison IS clean: identical load, identical
+ingress path, and the only difference is the priority class and the CPU
+request. The 18% recovery is attributable to the scheduling change. The 2.8x
+degradation is not attributable to any single cause.
+
+**2. KEDA never reached the requested worker count.** maxReplicaCount was 16
+and the queue depth reached 18,075 against a target of 2 per replica, so KEDA
+wanted the ceiling. Only 3-4 workers existed during sampling, because the
+underlying HorizontalPodAutoscaler rate-limits scale-up (roughly doubling per
+15 s cycle) and each phase restarted the Deployment at one replica. The
+contention measured is therefore MILDER than intended; a longer ramp would
+likely widen both the degradation and the recovery.
+
+This is also a finding for C1: scale-from-zero to N is not one step. Reaching
+capacity after a burst takes several HPA cycles, and that ramp is a cost of
+scale-to-zero that the cold-start measurement in e1 does not capture, because
+e1 only ever needed one replica.
+
+**3. A first attempt showed nothing at all**, and the reason is worth
+recording rather than hiding: the node has 12 allocatable CPUs, one worker was
+burning one core, and tenant-a's ResourceQuota was already exhausted at
+limits.cpu 2 of 2 so KEDA could not add replicas regardless of its ceiling. The
+quota silently capped the experiment before KEDA got a say. An experiment that
+runs cleanly and measures nothing is more dangerous than one that fails.

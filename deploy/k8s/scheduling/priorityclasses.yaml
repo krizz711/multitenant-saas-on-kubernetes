@@ -1,0 +1,36 @@
+# PriorityClasses are cluster-scoped, so they live here rather than in the
+# per-tenant chart: every tenant references the same two classes.
+#
+# IMPORTANT DISTINCTION, and the one most likely to be got wrong in a viva.
+# A PriorityClass decides WHICH POD GETS SCHEDULED and which gets evicted when
+# a node runs out of room. It does NOT decide how CPU is shared between pods
+# already running. Those are different mechanisms:
+#
+#   PriorityClass  -> scheduling order and preemption (who gets to exist)
+#   CPU requests   -> cgroup weight (who wins the CPU once both exist)
+#   CPU limits     -> hard throttle ceiling
+#
+# Claim C3 needs BOTH. Priority alone would not stop a running batch pod from
+# starving an interactive one, and CPU shares alone would not stop a flood of
+# batch pods from taking the node's last schedulable slot away from the API.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: tenant-interactive
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: >-
+  Requests with a human waiting. May preempt deferrable work to be scheduled.
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: tenant-batch
+value: 100
+globalDefault: false
+# Batch work must never push an interactive pod off a node to get scheduled
+# itself. It waits instead.
+preemptionPolicy: Never
+description: >-
+  Deferrable analytics. Yields to interactive work and never preempts it.

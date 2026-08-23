@@ -18,6 +18,12 @@ spec:
         tenant: {{ .Values.tenant }}
         tier: {{ .Values.tier }}
     spec:
+      {{- if .Values.scheduling.enabled }}
+      priorityClassName: {{ .Values.scheduling.batchPriorityClass }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: worker
           image: {{ .Values.images.worker }}

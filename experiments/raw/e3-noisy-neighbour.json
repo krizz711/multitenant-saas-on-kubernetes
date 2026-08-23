@@ -1,0 +1,39 @@
+{
+  "victim": "tenant-b",
+  "noisy": "tenant-a",
+  "node": "k3d-multitenant-agent-0",
+  "phases": [
+    {
+      "n": 748,
+      "failures": 0,
+      "p50_ms": 6.5,
+      "p95_ms": 26.9,
+      "p99_ms": 29.0,
+      "max_ms": 103.7,
+      "mean_ms": 9.8,
+      "phase": "quiet"
+    },
+    {
+      "n": 529,
+      "failures": 0,
+      "p50_ms": 28.6,
+      "p95_ms": 75.2,
+      "p99_ms": 123.7,
+      "max_ms": 209.7,
+      "mean_ms": 34.3,
+      "jobs_enqueued": 31445,
+      "phase": "unprotected"
+    },
+    {
+      "n": 546,
+      "failures": 0,
+      "p50_ms": 28.0,
+      "p95_ms": 61.4,
+      "p99_ms": 96.5,
+      "max_ms": 189.4,
+      "mean_ms": 31.6,
+      "jobs_enqueued": 24152,
+      "phase": "protected"
+    }
+  ]
+}

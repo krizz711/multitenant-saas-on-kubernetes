@@ -14,18 +14,27 @@ images:
 
 redisUrl: redis://redis.platform.svc.cluster.local:6379/0
 
+# CPU requests are the cgroup WEIGHT, not just a scheduling hint: under
+# contention each container gets CPU in proportion to its request. So the
+# request numbers below are the actual C3 mechanism, and they were previously
+# backwards - the worker asked for 200m against the API's 100m, meaning batch
+# work won twice the CPU of the request a human was waiting on.
+#
+# The pattern now is low guaranteed share, high ceiling for batch: the worker
+# may use a whole core when the node is idle, but yields immediately when the
+# API wants CPU.
 api:
   replicas: 1
   resources:
-    requests: { cpu: 100m, memory: 64Mi }
-    limits:   { cpu: 500m, memory: 256Mi }
+    requests: { cpu: 300m, memory: 64Mi }
+    limits:   { cpu: "1",  memory: 256Mi }
 
 worker:
   replicas: 1
   resources:
-    requests: { cpu: 200m, memory: 64Mi }
-    # Deliberately generous: the job must be able to saturate a core, because
-    # claim C3 is about what happens when it competes for one.
+    requests: { cpu: 100m, memory: 64Mi }
+    # Generous ceiling on purpose: the job must be able to saturate a core,
+    # because C3 is about what happens when it competes for one.
     limits:   { cpu: "1", memory: 256Mi }
 
 # The ceiling on everything this customer can ask for, summed across the
@@ -72,3 +81,22 @@ gateway:
   cacheThreshold: "0.90"
   cacheMaxEntries: 200
   cacheTTL: 24h
+
+# Fair scheduling (Module 8, claim C3).
+#
+# Setting enabled=false reproduces the "before" configuration: no priority
+# classes at all. Combined with equal CPU requests via --set, that is the
+# unprotected baseline the experiment measures against.
+scheduling:
+  enabled: true
+  interactivePriorityClass: tenant-interactive
+  batchPriorityClass: tenant-batch
+
+# Pin a tenant's pods to one node. Empty in normal operation - the scheduler
+# should place pods.
+#
+# The C3 experiment sets this because CPU shares are enforced by the kernel
+# cgroup hierarchy ON A NODE. Two pods on different nodes do not compete for
+# the same cores, so the mechanism being measured would simply not engage and
+# the experiment would show nothing while looking like it ran correctly.
+nodeSelector: {}
