@@ -44,3 +44,14 @@ quota:
     requestsMemory: 1Gi
     limitsMemory: 2Gi
     pods: "16"
+
+# Scale-to-zero (Module 6, claim C1).
+scaling:
+  enabled: true
+  maxReplicas: 3
+  listLength: 2
+  redisAddress: redis.platform.svc.cluster.local:6379
+  # Tuned to the compressed experiment clock - see the comment in
+  # templates/scaledobject.yaml. Production values would be far larger.
+  pollingInterval: 5
+  cooldownPeriod: 20

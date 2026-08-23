@@ -1,0 +1,39 @@
+{
+  "tenant": "tenant-c",
+  "trials": [
+    {
+      "scale_up_s": 5.8,
+      "drain_s": 6.37,
+      "trial": 1
+    },
+    {
+      "scale_up_s": 0.18,
+      "drain_s": 0.48,
+      "trial": 2
+    },
+    {
+      "scale_up_s": 4.9,
+      "drain_s": 6.01,
+      "trial": 3
+    },
+    {
+      "scale_up_s": 0.69,
+      "drain_s": 1.12,
+      "trial": 4
+    },
+    {
+      "scale_up_s": 3.85,
+      "drain_s": 14.34,
+      "trial": 5
+    },
+    {
+      "scale_up_s": 0.37,
+      "drain_s": 1.47,
+      "trial": 6
+    }
+  ],
+  "scale_up_s_median": 3.85,
+  "drain_s_median": 6.01,
+  "scale_up_s_max": 5.8,
+  "drain_s_max": 14.34
+}

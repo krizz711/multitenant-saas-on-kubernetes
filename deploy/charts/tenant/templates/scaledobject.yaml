@@ -1,0 +1,48 @@
+{{- if .Values.scaling.enabled }}
+# Claim C1 lives here.
+#
+# KEDA reads the depth of THIS tenant's Redis list and drives THIS tenant's
+# worker Deployment. That one-to-one mapping is why the queue was keyed per
+# tenant back in Module 2: a shared queue could only ever scale a shared pool,
+# and a shared pool can never reach zero for any individual customer.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker
+  namespace: {{ .Values.tenant }}
+  labels: { app: worker, tenant: {{ .Values.tenant }} }
+spec:
+  scaleTargetRef:
+    name: worker
+
+  # The line that the standard HorizontalPodAutoscaler cannot express. An HPA
+  # floors at one replica; an idle tenant therefore always costs one pod. Zero
+  # is the entire point of the claim.
+  minReplicaCount: 0
+  maxReplicaCount: {{ .Values.scaling.maxReplicas }}
+
+  # Both of these are deliberately far below KEDA's defaults, and the reason is
+  # the experiment's compressed clock: one simulated hour is five real seconds,
+  # so a whole simulated day lasts two minutes. KEDA's default 30 s polling and
+  # 300 s cooldown would mean the cooldown alone outlasts two full simulated
+  # days - the worker would never scale down and C1 could not be observed.
+  #
+  # This is a measurement decision, not tuning, and the paper must state it:
+  # the cooldown is scaled to the compressed clock, and a production system on
+  # a real 24-hour cycle would use much larger values.
+  pollingInterval: {{ .Values.scaling.pollingInterval }}
+  cooldownPeriod: {{ .Values.scaling.cooldownPeriod }}
+
+  triggers:
+    - type: redis
+      metadata:
+        address: {{ .Values.scaling.redisAddress | quote }}
+        listName: {{ printf "q:%s" .Values.tenant | quote }}
+        # Target backlog per replica: KEDA adds a worker for roughly every
+        # listLength pending jobs.
+        listLength: {{ .Values.scaling.listLength | quote }}
+        # Above zero, wake up. Without this KEDA treats any depth below
+        # listLength as "no activity" and never leaves zero, which looks
+        # exactly like a broken scaler.
+        activationListLength: "0"
+{{- end }}
