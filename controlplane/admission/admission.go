@@ -36,7 +36,10 @@ const (
 // synchronously. Kept as an explicit set: classification is a policy decision,
 // not something to infer from the HTTP method.
 var deferrablePaths = map[string]bool{
-	"/analyze": true,
+	// Rebuilding the catalogue's similarity graph. Nobody is waiting on it,
+	// so the control plane may queue it, run it at low priority, and let the
+	// tenant's workers sit at zero until it arrives.
+	"/reindex": true,
 	"/report":  true,
 }
 

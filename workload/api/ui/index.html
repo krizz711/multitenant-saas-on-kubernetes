@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storefront</title>
+<style>
+  :root {
+    --bg: #0f1216; --panel: #171b21; --line: #272d36;
+    --text: #e8ecf1; --muted: #9aa5b1; --accent: #5aa9ff; --warm: #ffb55a;
+    --ok: #4ad295; --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--font); font-size: 15px; line-height: 1.5;
+  }
+  header {
+    padding: 18px 16px; border-bottom: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline;
+  }
+  h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .tenant {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+    color: var(--accent); background: #16222e; border: 1px solid #244055;
+    padding: 2px 8px; border-radius: 999px;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  @media (min-width: 820px) { main { grid-template-columns: 1fr 1fr; } }
+  section {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px;
+  }
+  h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted);
+       text-transform: uppercase; letter-spacing: 0.06em; }
+  .row { display: flex; gap: 8px; }
+  input, button {
+    font: inherit; border-radius: 7px; border: 1px solid var(--line);
+  }
+  input {
+    flex: 1; min-width: 0; padding: 9px 11px;
+    background: #0d1014; color: var(--text);
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button {
+    padding: 9px 14px; background: var(--accent); color: #06111c;
+    font-weight: 600; cursor: pointer; border-color: transparent;
+  }
+  button.secondary { background: var(--warm); color: #231603; }
+  button:disabled { opacity: 0.55; cursor: progress; }
+  .meta {
+    margin-top: 10px; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--muted);
+  }
+  .hit { color: var(--ok); font-weight: 600; }
+  ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+  li { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; background: #12161b; }
+  .name { font-weight: 600; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .price { float: right; color: var(--warm); font-variant-numeric: tabular-nums; }
+  .answer {
+    margin-top: 10px; padding: 11px; border-radius: 8px;
+    background: #12161b; border: 1px solid var(--line); white-space: pre-wrap;
+  }
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px; margin-top: 10px;
+  }
+  .stat { background: #12161b; border: 1px solid var(--line);
+          border-radius: 8px; padding: 9px 11px; }
+  .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Storefront</h1>
+  <span class="tenant" id="tenant">{{TENANT}}</span>
+  <span class="sub">every request below carries this tenant id; the control plane routes, meters and bills on it</span>
+</header>
+
+<main>
+  <section>
+    <h2>Catalogue search &middot; interactive</h2>
+    <div class="row">
+      <input id="q" placeholder="jacket, headphones, skillet&hellip;" autocomplete="off">
+      <button id="searchBtn">Search</button>
+    </div>
+    <div class="meta" id="searchMeta">&nbsp;</div>
+    <ul id="results"></ul>
+  </section>
+
+  <section>
+    <h2>Ask the assistant &middot; interactive, metered</h2>
+    <div class="row">
+      <input id="question" placeholder="Which jacket works in heavy rain?" autocomplete="off">
+      <button id="askBtn">Ask</button>
+    </div>
+    <div class="meta" id="askMeta">&nbsp;</div>
+    <div class="answer" id="answer" hidden></div>
+  </section>
+
+  <section>
+    <h2>Rebuild related products &middot; deferrable</h2>
+    <p class="sub" style="margin:0">
+      Queues a CPU-bound job. Returns immediately with 202 &mdash; nobody is waiting on it,
+      so the control plane may delay it, run it at low priority, and keep this tenant's
+      workers at zero until it arrives.
+    </p>
+    <div class="row" style="margin-top:10px">
+      <button id="reindexBtn" class="secondary">Rebuild index</button>
+    </div>
+    <div class="meta" id="reindexMeta">&nbsp;</div>
+  </section>
+
+  <section>
+    <h2>This tenant&rsquo;s data</h2>
+    <div class="stats">
+      <div class="stat"><b id="sProducts">&ndash;</b><span>products</span></div>
+      <div class="stat"><b id="sEdges">&ndash;</b><span>related edges</span></div>
+      <div class="stat"><b id="sStorage">&ndash;</b><span>schema on disk</span></div>
+    </div>
+    <div class="meta" id="statsMeta">&nbsp;</div>
+  </section>
+</main>
+
+<script>
+  // The tenant id is stamped into the page by the server and sent on every
+  // request. A real deployment would derive it from an authenticated token
+  // rather than trust the client, which is the note in admission.Middleware.
+  const TENANT = document.getElementById("tenant").textContent.trim();
+  const headers = { "Content-Type": "application/json", "X-Tenant": TENANT };
+
+  const $ = (id) => document.getElementById(id);
+  const bytes = (n) =>
+    n >= 1048576 ? (n / 1048576).toFixed(1) + " MB"
+    : n >= 1024  ? (n / 1024).toFixed(0) + " KB"
+    : n + " B";
+
+  async function timed(fn) {
+    const t0 = performance.now();
+    const out = await fn();
+    return [out, Math.round(performance.now() - t0)];
+  }
+
+  function paintStats(c) {
+    if (!c) return;
+    $("sProducts").textContent = c.products ?? "–";
+    $("sEdges").textContent = c.related_edges ?? "–";
+    $("sStorage").textContent = c.storage_bytes ? bytes(c.storage_bytes) : "–";
+    $("statsMeta").textContent = c.last_reindex
+      ? "last rebuild " + new Date(c.last_reindex).toLocaleTimeString()
+      : "never rebuilt — related edges stay at 0 until you queue a job";
+  }
+
+  async function search() {
+    const btn = $("searchBtn"); btn.disabled = true;
+    try {
+      const [data, ms] = await timed(async () => {
+        const r = await fetch("/products?q=" + encodeURIComponent($("q").value) + "&limit=8",
+                              { headers });
+        return r.json();
+      });
+      $("searchMeta").textContent = `${data.count} results in ${ms} ms · class=${data.class}`;
+      $("results").innerHTML = (data.products || []).map((p) => `
+        <li><span class="price">₹${Math.round(p.price_inr).toLocaleString("en-IN")}</span>
+          <div class="name">${p.name}</div>
+          <div class="sub">${p.category} — ${p.description}</div></li>`).join("");
+      paintStats(data.catalogue);
+    } catch (e) {
+      $("searchMeta").textContent = "search failed: " + e;
+    } finally { btn.disabled = false; }
+  }
+
+  async function ask() {
+    const btn = $("askBtn"); btn.disabled = true;
+    $("answer").hidden = false; $("answer").textContent = "thinking…";
+    try {
+      const [data, ms] = await timed(async () => {
+        const r = await fetch("/ask", {
+          method: "POST", headers,
+          body: JSON.stringify({ question: $("question").value }),
+        });
+        return r.json();
+      });
+      if (data.error) { $("answer").textContent = data.error; $("askMeta").textContent = ""; return; }
+      $("answer").textContent = data.answer;
+      // Showing the cache flag is the whole point of the demo: ask the same
+      // question twice and watch the tokens stop being bought.
+      $("askMeta").innerHTML = data.cached
+        ? `<span class="hit">served from cache</span> in ${ms} ms · 0 tokens bought · ${data.model}`
+        : `model call in ${ms} ms · ${data.prompt_tokens}+${data.output_tokens} tokens · ${data.model}`;
+    } catch (e) {
+      $("answer").textContent = "ask failed: " + e;
+    } finally { btn.disabled = false; }
+  }
+
+  async function reindex() {
+    const btn = $("reindexBtn"); btn.disabled = true;
+    try {
+      const [data, ms] = await timed(async () => {
+        const r = await fetch("/reindex", { method: "POST", headers, body: "{}" });
+        return r.json();
+      });
+      $("reindexMeta").textContent = data.job_id
+        ? `queued ${data.job_id} in ${ms} ms · queue depth ${data.queue_depth} · worker scales up on demand`
+        : (data.error || "queue failed");
+      setTimeout(search, 4000);
+    } catch (e) {
+      $("reindexMeta").textContent = "reindex failed: " + e;
+    } finally { btn.disabled = false; }
+  }
+
+  $("searchBtn").onclick = search;
+  $("askBtn").onclick = ask;
+  $("reindexBtn").onclick = reindex;
+  $("q").addEventListener("keydown", (e) => e.key === "Enter" && search());
+  $("question").addEventListener("keydown", (e) => e.key === "Enter" && ask());
+  search();
+</script>
+</body>
+</html>

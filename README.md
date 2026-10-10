@@ -74,37 +74,44 @@ Regenerated from raw run data by `make report`. Empty until the experiment campa
 ## Repository layout
 
 ```text
-workload/            the demonstration application - deliberately small, frozen, replaceable
-  api/               Go: /summary (cheap read), /ask (model call), /analyze (enqueue -> 202)
+workload/            the demonstration application - small, frozen, REPLACEABLE
+  api/               Go: /products (search), /ask (assistant), /reindex (enqueue -> 202)
+  api/ui/            a single-page storefront, served at /shop
   worker/            queue consumer, one per tenant, blocks rather than polls
-  analysis/          the domain-specific surface - CPU-bound work of tunable size, swappable
-controlplane/        the actual deliverable - application-agnostic
-  admission/         tenant id + latency-class tagging middleware
+  catalogue/         the domain surface - TF-IDF similarity over a product catalogue
+  store/             per-tenant Postgres schema: products, related_products, runs
+controlplane/        the deliverable - application-agnostic
+  admission/         tenant id + latency-class tagging
   queue/             one Redis list per tenant; the key KEDA scales on
-  model/             the only boundary to the language model
+  model/             the only boundary to the language model (stub or Gemini)
+  gateway/           per-tenant token budget, semantic cache, prompt coalescing
   obs/               histograms whose buckets put the SLO on an exact edge
-  gateway/           token budget, semantic cache, prompt coalescing        (Module 7)
-  scaler/            KEDA ScaledObjects and HTTP add-on configuration       (Module 6)
-  costmeter/         PromQL recording rules -> rupees per tenant            (Module 9)
+  scaler/  costmeter/                                            (Module 9)
 deploy/
-  charts/            Helm chart, one release per tenant
-  k8s/               PriorityClasses, ResourceQuotas, NetworkPolicies
-  terraform/         free-tier VM + k3s bootstrap
-  argocd/            Application definitions
+  charts/tenant/     one Helm release per customer: namespace, quota,
+                     NetworkPolicies, ingress, ScaledObject, schema provisioning
+  k8s/platform/      shared Redis and Postgres - the only always-on components
+  k8s/monitoring/    kube-prometheus-stack values and scrape monitors
+  k8s/scheduling/    PriorityClasses
+  terraform/ argocd/                                             (Module 11)
 experiments/
-  tenants.py         tenant population and shift-shaped load model
-  questions.yaml     fixed question set used to validate cache answer quality
-  run.py             configuration x repeat runner (E1-E7)
-  raw/               committed raw run output - the evidence behind every figure
-  figures.py         regenerates every figure from raw/
+  tenants.py         shift-shaped multi-tenant load model (Locust)
+  coldstart.py       E1 - cold-start penalty, claim C1
+  noisyneighbour.py  E3 - interference under load, claim C3
+  questions.yaml     fixed question set for cache answer quality
+  raw/               committed raw output - the evidence behind every figure
 ```
 
-### Swapping the workload
+### Swapping the workload — already done once
 
-`workload/` is a stand-in, not a commitment. It computes a gauge repeatability-and-reproducibility
-study because that is the analysis which motivated this project, but any deterministic CPU-bound
-function of tunable size fills the same role, and any LLM-backed web application could take its
-place.
+`workload/` is a stand-in, not a commitment, and it has been replaced in anger to prove it. The
+original demonstration application was a gauge repeatability-and-reproducibility tool for
+manufacturing. It is now an online shop: catalogue search, an LLM shopping assistant, and a
+CPU-bound "related products" rebuild.
+
+**Not one line of `controlplane/` changed.** The same admission tagging, per-tenant queue, token
+gateway, autoscaler and priority classes govern a storefront exactly as they governed a
+measurement-systems tool. Any LLM-backed web application can take the same place.
 
 That is only credible because the dependency runs one way: **nothing in `controlplane/` imports
 anything from `workload/`**, and `TestControlPlaneDoesNotImportWorkload` enforces it on every CI

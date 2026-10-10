@@ -33,4 +33,7 @@ spec:
           env:
             - { name: TENANT,    value: {{ .Values.tenant | quote }} }
             - { name: REDIS_URL, value: {{ .Values.redisUrl | quote }} }
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.tenant }}-db, key: url }
           resources: {{- toYaml .Values.worker.resources | nindent 12 }}

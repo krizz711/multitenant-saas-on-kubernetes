@@ -35,6 +35,17 @@ spec:
             - { name: CACHE_THRESHOLD,   value: {{ .Values.gateway.cacheThreshold | quote }} }
             - { name: CACHE_MAX_ENTRIES, value: {{ .Values.gateway.cacheMaxEntries | quote }} }
             - { name: CACHE_TTL,         value: {{ .Values.gateway.cacheTTL | quote }} }
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.tenant }}-db, key: url }
+            - { name: CATALOGUE_SIZE, value: {{ .Values.catalogueSize | quote }} }
+            {{- with .Values.geminiSecret }}
+            # Optional. With no key the API falls back to the deterministic
+            # stub, which is what the experiments run against anyway.
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef: { name: {{ . }}, key: apiKey, optional: true }
+            {{- end }}
           resources: {{- toYaml .Values.api.resources | nindent 12 }}
           readinessProbe:
             httpGet: { path: /healthz, port: http }

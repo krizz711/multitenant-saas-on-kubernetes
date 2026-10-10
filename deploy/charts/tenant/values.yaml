@@ -100,3 +100,16 @@ scheduling:
 # the same cores, so the mechanism being measured would simply not engage and
 # the experiment would show nothing while looking like it ran correctly.
 nodeSelector: {}
+
+# How many products the merchant is seeded with on first start.
+#
+# Calibrated, not guessed: a re-index is O(n^2) in catalogue size and 400
+# products is about 390 ms of solid CPU on the development machine. Long
+# enough to contend for a core in the C3 experiment, short enough that a live
+# demo finishes while somebody is watching. Recalibrate with
+# `go test ./workload/catalogue -bench=.` if the hardware changes.
+catalogueSize: 400
+
+# Name of a Secret holding `apiKey` for the hosted model. Leave empty to run
+# on the deterministic stub.
+geminiSecret: ""

@@ -1,0 +1,98 @@
+# One shared Postgres, a schema per tenant. This is the "bridge model" of
+# multi-tenancy named in the Review 1 document: shared infrastructure with
+# isolated data.
+#
+# The alternative - a database per tenant - isolates more strongly but puts a
+# permanent per-customer floor under idle cost, which is exactly the cost model
+# this project argues against. Sharing the instance and separating by schema
+# keeps the always-on set to two components: this and Redis.
+#
+# Those two are the only things that never scale to zero, and that is the
+# honest boundary of claim C1: an idle tenant's MARGINAL cost approaches zero,
+# but the platform's fixed cost does not.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-superuser
+  namespace: platform
+type: Opaque
+stringData:
+  # Local development only. A real deployment takes this from a secret manager,
+  # which is the Secrets Manager box in the AWS reference architecture.
+  password: devpassword
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: platform
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: platform
+spec:
+  replicas: 1
+  strategy:
+    # A PVC with ReadWriteOnce cannot be mounted by two pods at once, so a
+    # rolling update would deadlock: the new pod waits for a volume the old pod
+    # still holds. Recreate is correct here and the reason is worth knowing.
+    type: Recreate
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports: [{ name: pg, containerPort: 5432 }]
+          env:
+            - name: POSTGRES_DB
+              value: saas
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-superuser, key: password }
+            # The image only initialises a fresh cluster when this subdirectory
+            # is empty; pointing at the mount root fails because lost+found
+            # already exists there on some volume types.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "saas"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "saas"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: platform
+spec:
+  selector: { app: postgres }
+  ports:
+    - { name: pg, port: 5432, targetPort: pg }

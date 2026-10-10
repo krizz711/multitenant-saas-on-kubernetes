@@ -1,0 +1,80 @@
+{{- $schema := .Values.tenant | replace "-" "_" -}}
+{{- /*
+  Creates the tenant's schema and a role restricted to it.
+
+  This runs in the platform namespace, not the tenant's, because it needs the
+  Postgres superuser credential - and putting that credential inside a tenant
+  namespace would hand every tenant the keys to every other tenant's data,
+  defeating the isolation it exists to create.
+
+  It is a Helm hook so it runs before the tenant's pods start and can be
+  re-run idempotently on upgrade.
+*/ -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.tenant }}-db-provision
+  namespace: platform
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: provision
+          image: postgres:16-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-superuser, key: password }
+            - name: TENANT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.tenant }}-db, key: password }
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              until pg_isready -h postgres -U postgres -d saas; do sleep 2; done
+              psql -h postgres -U postgres -d saas -v ON_ERROR_STOP=1 <<SQL
+              -- Every statement is idempotent: this Job re-runs on every upgrade.
+              CREATE SCHEMA IF NOT EXISTS {{ $schema }};
+
+              DO \$\$
+              BEGIN
+                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ $schema }}') THEN
+                  CREATE ROLE {{ $schema }} LOGIN;
+                END IF;
+              END
+              \$\$;
+
+              -- Unescaped on purpose. The heredoc below is UNQUOTED, so the
+              -- shell expands this to the real password. The \$\$ in the DO
+              -- block above must stay escaped for the opposite reason: those
+              -- dollars belong to PostgreSQL, not the shell. Escaping this one
+              -- too set every tenant's password to the literal string
+              -- "$TENANT_PASSWORD" and every connection failed SASL auth.
+              ALTER ROLE {{ $schema }} WITH PASSWORD '$TENANT_PASSWORD';
+
+              -- The isolation itself. The tenant owns its schema and has no
+              -- grant on anyone else's, and Postgres denies cross-schema access
+              -- by default - so tenant-a cannot read tenant-b even by fully
+              -- qualifying the name.
+              ALTER SCHEMA {{ $schema }} OWNER TO {{ $schema }};
+              GRANT USAGE, CREATE ON SCHEMA {{ $schema }} TO {{ $schema }};
+
+              -- public is writable by everyone by default, which would be a
+              -- shared back channel between tenants.
+              REVOKE ALL ON SCHEMA public FROM {{ $schema }};
+
+              ALTER ROLE {{ $schema }} SET search_path = {{ $schema }};
+              SQL
+              echo "provisioned schema {{ $schema }}"
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
