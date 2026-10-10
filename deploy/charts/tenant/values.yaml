@@ -110,6 +110,10 @@ nodeSelector: {}
 # `go test ./workload/catalogue -bench=.` if the hardware changes.
 catalogueSize: 400
 
-# Name of a Secret holding `apiKey` for the hosted model. Leave empty to run
-# on the deterministic stub.
+# Name of a Secret holding `apiKey` for Gemini. Leave empty for the stub.
 geminiSecret: ""
+
+# Name of a Secret holding `clientId` and `clientSecret` for Gloo, or any
+# other OAuth2-fronted OpenAI-compatible endpoint. Takes precedence over
+# Gemini when both are set.
+glooSecret: ""

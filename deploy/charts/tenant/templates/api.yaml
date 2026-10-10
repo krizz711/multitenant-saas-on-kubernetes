@@ -40,11 +40,24 @@ spec:
                 secretKeyRef: { name: {{ .Values.tenant }}-db, key: url }
             - { name: CATALOGUE_SIZE, value: {{ .Values.catalogueSize | quote }} }
             {{- with .Values.geminiSecret }}
-            # Optional. With no key the API falls back to the deterministic
-            # stub, which is what the experiments run against anyway.
+            # Optional. With no credentials at all the API falls back to the
+            # deterministic stub, which is what the experiments run against
+            # anyway.
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef: { name: {{ . }}, key: apiKey, optional: true }
+            {{- end }}
+            {{- with .Values.glooSecret }}
+            # Takes precedence over Gemini when present. Swapping the model
+            # vendor is this and nothing else - no code, no redeploy of the
+            # control plane, no change to the gateway, budget, cache or
+            # metrics.
+            - name: GLOO_CLIENT_ID
+              valueFrom:
+                secretKeyRef: { name: {{ . }}, key: clientId, optional: true }
+            - name: GLOO_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: { name: {{ . }}, key: clientSecret, optional: true }
             {{- end }}
           resources: {{- toYaml .Values.api.resources | nindent 12 }}
           readinessProbe:

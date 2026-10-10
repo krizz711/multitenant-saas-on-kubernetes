@@ -114,17 +114,37 @@ func main() {
 // for demonstrations, where an answer a human can read matters more than a
 // reproducible millisecond.
 func chooseModel(log *slog.Logger) model.Client {
+	// Provider selection is the only place in the codebase that knows which
+	// vendor is in use. The gateway, the budget, the cache, the coalescer and
+	// every metric sit behind model.Client and are indifferent to the answer
+	// here - which is the architectural claim, made concrete.
+	if id, secret := os.Getenv("GLOO_CLIENT_ID"), os.Getenv("GLOO_CLIENT_SECRET"); id != "" && secret != "" {
+		m := os.Getenv("GLOO_MODEL")
+		log.Info("using Gloo (OpenAI-compatible)", "model", or(m, "auto-routing"))
+		return model.NewGloo(id, secret, m, envDuration("MODEL_TIMEOUT", 30*time.Second))
+	}
 	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
 		m := envString("GEMINI_MODEL", "gemini-2.0-flash")
-		log.Info("using hosted model", "model", m)
+		log.Info("using Gemini", "model", m)
 		return model.NewGemini(key, m, envDuration("MODEL_TIMEOUT", 20*time.Second))
 	}
-	log.Info("no GEMINI_API_KEY set, using deterministic stub")
+
+	// The deterministic stub is what the experiments run against on purpose:
+	// a rate-limited dependency in the request path would contaminate every
+	// latency number in the results.
+	log.Info("no model credentials set, using deterministic stub")
 	return model.NewStub(
 		envInt64("MODEL_SEED", 1),
 		envDuration("MODEL_BASE_LATENCY", 120*time.Millisecond),
 		envDuration("MODEL_JITTER", 80*time.Millisecond),
 	)
+}
+
+func or(v, fallback string) string {
+	if v != "" {
+		return v
+	}
+	return fallback
 }
 
 func openStore(ctx context.Context, tenant string, log *slog.Logger) store.Store {
