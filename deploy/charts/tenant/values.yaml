@@ -117,3 +117,15 @@ geminiSecret: ""
 # other OAuth2-fronted OpenAI-compatible endpoint. Takes precedence over
 # Gemini when both are set.
 glooSecret: ""
+
+# The suffix every tenant hostname hangs off.
+#
+# Locally this is "localhost", because browsers resolve *.localhost to the
+# loopback address with no DNS setup at all.
+#
+# On a public VM, set it to "<PUBLIC_IP>.nip.io". nip.io is a wildcard DNS
+# service that resolves anything.1.2.3.4.nip.io back to 1.2.3.4, which gives
+# real per-tenant hostnames with no domain to buy and no DNS records to
+# create. Host-based routing is what separates tenants at the edge, so the
+# demonstration needs distinct names rather than one bare IP.
+baseDomain: localhost

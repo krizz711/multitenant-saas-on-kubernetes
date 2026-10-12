@@ -15,7 +15,7 @@ metadata:
   labels: { app: api, tenant: {{ .Values.tenant }} }
 spec:
   rules:
-    - host: {{ .Values.tenant }}.localhost
+    - host: {{ .Values.tenant }}.{{ .Values.baseDomain }}
       http:
         paths:
           - path: /

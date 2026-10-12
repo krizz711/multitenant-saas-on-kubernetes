@@ -121,12 +121,16 @@ func chooseModel(log *slog.Logger) model.Client {
 	if id, secret := os.Getenv("GLOO_CLIENT_ID"), os.Getenv("GLOO_CLIENT_SECRET"); id != "" && secret != "" {
 		m := os.Getenv("GLOO_MODEL")
 		log.Info("using Gloo (OpenAI-compatible)", "model", or(m, "auto-routing"))
-		return model.NewGloo(id, secret, m, envDuration("MODEL_TIMEOUT", 30*time.Second))
+		// Wrapped so an unreachable provider degrades to a local answer
+		// instead of returning 502 to a shopper.
+		return model.StubFallback(
+			model.NewGloo(id, secret, m, envDuration("MODEL_TIMEOUT", 30*time.Second)), log)
 	}
 	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
 		m := envString("GEMINI_MODEL", "gemini-2.0-flash")
 		log.Info("using Gemini", "model", m)
-		return model.NewGemini(key, m, envDuration("MODEL_TIMEOUT", 20*time.Second))
+		return model.StubFallback(
+			model.NewGemini(key, m, envDuration("MODEL_TIMEOUT", 20*time.Second)), log)
 	}
 
 	// The deterministic stub is what the experiments run against on purpose:
