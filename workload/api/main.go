@@ -12,7 +12,6 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -30,7 +29,7 @@ import (
 	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/model"
 	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/obs"
 	"github.com/krizz711/multitenant-saas-on-kubernetes/controlplane/queue"
-	"github.com/krizz711/multitenant-saas-on-kubernetes/workload/catalogue"
+	"github.com/krizz711/multitenant-saas-on-kubernetes/workload/grounding"
 	"github.com/krizz711/multitenant-saas-on-kubernetes/workload/store"
 )
 
@@ -59,8 +58,14 @@ func main() {
 
 	// The gateway wraps the model rather than replacing it and satisfies the
 	// same interface, so handleAsk below never learns which model is behind it.
+	db := openStore(context.Background(), tenant, log)
+	defer db.Close()
+
+	// Layering matters: gateway -> grounding -> vendor. The gateway must see
+	// the shopper's question, not the grounded prompt, or two different
+	// questions retrieving the same products collide in the cache.
 	llm := gateway.New(
-		upstream,
+		grounding.New(upstream, db, envInt("GROUNDING_PRODUCTS", 5)),
 		gateway.NewBudget(rdb, envInt64("TOKEN_BUDGET", 100_000), nil),
 		gateway.NewCache(
 			rdb,
@@ -70,9 +75,6 @@ func main() {
 			envDuration("CACHE_TTL", 24*time.Hour),
 		),
 	)
-
-	db := openStore(context.Background(), tenant, log)
-	defer db.Close()
 
 	srv := &http.Server{
 		Addr:              ":" + envString("PORT", "8000"),
@@ -308,12 +310,16 @@ func handleAsk(llm model.Client, db store.Store, log *slog.Logger) http.HandlerF
 
 		tenant := admission.Tenant(r.Context())
 
-		grounding, err := db.Search(r.Context(), keywords(req.Question), 5)
+		// The raw question goes to the gateway so the cache matches on what
+		// the shopper asked. The same search runs again below for display
+		// only - two cheap indexed lookups are worth more than threading
+		// retrieval state back up through the model interface.
+		shown, err := db.Search(r.Context(), grounding.Keywords(req.Question), 5)
 		if err != nil {
-			log.Error("grounding search failed", "tenant", tenant, "err", err)
+			log.Error("display search failed", "tenant", tenant, "err", err)
 		}
 
-		answer, err := llm.Ask(r.Context(), tenant, buildPrompt(req.Question, grounding))
+		answer, err := llm.Ask(r.Context(), tenant, req.Question)
 		if err != nil {
 			// A cancelled request is the client's decision, not a server
 			// fault, and must not count against the error rate.
@@ -341,49 +347,9 @@ func handleAsk(llm model.Client, db store.Store, log *slog.Logger) http.HandlerF
 			"model":         answer.Model,
 			"prompt_tokens": answer.PromptTokens,
 			"output_tokens": answer.OutputTokens,
-			"products":      grounding,
+			"products":      shown,
 		})
 	}
-}
-
-// buildPrompt grounds the question in the merchant's catalogue.
-func buildPrompt(question string, products []catalogue.Product) string {
-	var sb strings.Builder
-	sb.WriteString("You are a shopping assistant. Answer using only the products listed.\n")
-	sb.WriteString("Be brief: two sentences at most, and name the product you recommend.\n\n")
-
-	if len(products) == 0 {
-		sb.WriteString("Products: none matched.\n\n")
-	} else {
-		sb.WriteString("Products:\n")
-		for _, p := range products {
-			fmt.Fprintf(&sb, "- %s (%s) Rs %.0f: %s\n",
-				p.Name, p.Category, p.PriceINR, p.Description)
-		}
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString("Question: ")
-	sb.WriteString(question)
-	return sb.String()
-}
-
-// keywords strips the question down to terms worth searching on, because
-// "do you have a waterproof jacket" matches no product name verbatim.
-func keywords(question string) string {
-	fields := strings.Fields(strings.ToLower(question))
-	for _, f := range fields {
-		trimmed := strings.Trim(f, "?,.!\"'")
-		if len(trimmed) > 4 && !questionWords[trimmed] {
-			return trimmed
-		}
-	}
-	return ""
-}
-
-var questionWords = map[string]bool{
-	"which": true, "where": true, "there": true, "about": true, "would": true,
-	"could": true, "should": true, "please": true, "whats": true, "under": true,
 }
 
 // handleReindex is the deferrable path. It does no work: it writes a job to

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math/rand"
+	"sort"
 
 	"github.com/krizz711/multitenant-saas-on-kubernetes/workload/catalogue"
 )
@@ -32,9 +33,12 @@ func SeedCatalogue(tenant string, count int) []catalogue.Product {
 
 	for i := 0; i < count; i++ {
 		category := trade.categories[i%len(trade.categories)]
-		material := trade.materials[rng.Intn(len(trade.materials))]
+		names := trade.materialNames()
+		material := names[rng.Intn(len(names))]
 		quality := qualifiers[rng.Intn(len(qualifiers))]
-		feature := trade.features[rng.Intn(len(trade.features))]
+		// The feature follows from the material rather than being drawn
+		// independently, so the description never contradicts the name.
+		feature := trade.materials[material]
 
 		products = append(products, catalogue.Product{
 			Name: fmt.Sprintf("%s %s %s %d", quality, material, category, 100+i),
@@ -53,8 +57,23 @@ func SeedCatalogue(tenant string, count int) []catalogue.Product {
 type trade struct {
 	brand      string
 	categories []string
-	materials  []string
-	features   []string
+	// materials maps a material to the claim that material actually implies.
+	//
+	// Pairing them randomly produced a catalogue that contradicted itself - a
+	// goretex jacket described as "rated to minus ten degrees" and nothing
+	// anywhere claiming to be waterproof. The assistant then correctly refused
+	// to recommend anything for rain, which looks like a broken assistant and
+	// is really broken data. Grounded answers are only as good as the ground.
+	materials map[string]string
+}
+
+func (t trade) materialNames() []string {
+	names := make([]string, 0, len(t.materials))
+	for m := range t.materials {
+		names = append(names, m)
+	}
+	sort.Strings(names) // deterministic: the same merchant twice is the same catalogue
+	return names
 }
 
 // tradeFor maps a tenant to a line of business. Unknown tenants fall back to
@@ -66,36 +85,36 @@ func tradeFor(tenant string) trade {
 		return trade{
 			brand:      "Meridian Electronics",
 			categories: []string{"headphones", "keyboard", "monitor", "webcam", "powerbank", "router"},
-			materials:  []string{"aluminium", "carbon", "matte", "brushed", "compact"},
-			features: []string{
-				"Noise cancelling and a 30 hour battery",
-				"USB-C fast charging included",
-				"Low latency wireless connection",
-				"Backlit with adjustable brightness",
+			materials: map[string]string{
+				"noise-cancelling": "Blocks engine and cabin noise, with a 30 hour battery. Ideal for travel and flights",
+				"fast-charge":      "USB-C fast charging, zero to full in under an hour",
+				"wireless":         "Low latency wireless connection with no dongle required",
+				"backlit":          "Backlit with adjustable brightness for working after dark",
+				"compact":          "Folds flat and weighs under 300 grams, built for a carry-on",
 			},
 		}
 	case "tenant-b":
 		return trade{
 			brand:      "Northfield Outdoor",
 			categories: []string{"jacket", "boots", "backpack", "tent", "gloves", "fleece"},
-			materials:  []string{"merino", "ripstop", "goretex", "canvas", "down"},
-			features: []string{
-				"Fully waterproof with taped seams",
-				"Breathable and quick drying",
-				"Rated to minus ten degrees",
-				"Packs down to one litre",
+			materials: map[string]string{
+				"goretex": "Fully waterproof with taped seams, built for heavy rain and storms",
+				"down":    "Rated to minus ten degrees, the warmest thing we sell for winter",
+				"merino":  "Breathable and quick drying, warm even when damp",
+				"ripstop": "Packs down to one litre and resists tearing on rock",
+				"canvas":  "Hard wearing everyday fabric, not waterproof",
 			},
 		}
 	default:
 		return trade{
 			brand:      "Harbour Home",
 			categories: []string{"skillet", "kettle", "blender", "storage", "lamp", "cushion"},
-			materials:  []string{"cast iron", "stoneware", "bamboo", "stainless", "linen"},
-			features: []string{
-				"Dishwasher safe and oven proof",
-				"Hand finished in small batches",
-				"Non stick without any coating",
-				"Stackable to save cupboard space",
+			materials: map[string]string{
+				"cast iron": "Oven proof to 250 degrees and naturally non stick once seasoned",
+				"stoneware": "Hand finished in small batches, dishwasher and microwave safe",
+				"bamboo":    "Lightweight, sustainably grown, stackable to save cupboard space",
+				"stainless": "Dishwasher safe and will not stain or rust",
+				"linen":     "Washable, softens with use, oeko-tex certified",
 			},
 		}
 	}
