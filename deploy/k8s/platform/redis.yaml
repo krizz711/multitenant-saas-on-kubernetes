@@ -10,6 +10,24 @@ kind: Namespace
 metadata:
   name: platform
 ---
+# Redis holds two things that must outlive a pod restart: the per-tenant job
+# queues, and the semantic cache.
+#
+# Losing the queue would drop accepted work a tenant was told had been
+# accepted - /reindex returns 202, which is a promise. Losing the cache is
+# less serious but still wrong: every cached answer was paid for in tokens
+# once, and discarding them silently re-spends a tenant's budget.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+  namespace: platform
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,6 +35,10 @@ metadata:
   namespace: platform
 spec:
   replicas: 1
+  strategy:
+    # ReadWriteOnce cannot be mounted by two pods at once, so a rolling update
+    # would deadlock waiting for a volume the old pod still holds.
+    type: Recreate
   selector:
     matchLabels: { app: redis }
   template:
@@ -26,6 +48,11 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
+          # Append-only file, flushed once a second. Redis defaults to
+          # snapshotting, which can lose the last several minutes of writes -
+          # and the last several minutes is exactly the window containing the
+          # jobs and cached answers from a demonstration.
+          args: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
           ports: [{ containerPort: 6379 }]
           # Redis is one of only two things in this design that must stay
           # resident, so its footprint is part of the fixed cost the cost
@@ -33,11 +60,17 @@ spec:
           resources:
             requests: { cpu: 50m, memory: 64Mi }
             limits:   { cpu: 200m, memory: 128Mi }
+          volumeMounts:
+            - { name: data, mountPath: /data }
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]
             initialDelaySeconds: 2
             periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: redis-data
 ---
 apiVersion: v1
 kind: Service
