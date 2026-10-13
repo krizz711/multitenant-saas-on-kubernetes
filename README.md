@@ -2,168 +2,235 @@
 
 # Multi-tenant SaaS on Kubernetes
 
-### A cost- and SLO-aware multi-tenant control plane for LLM-backed applications on Kubernetes.
+### A cost- and SLO-aware control plane for LLM-backed applications
 
-**Scale each tenant to zero when idle. Cap what any tenant can spend on model tokens. Keep one customer's batch job from slowing another customer's request. Then put a rupee figure on every tenant.**
+**Scale each tenant to zero when idle. Cap what any tenant can spend on model tokens.
+Keep one customer's batch job from slowing another customer's request.
+Then put a rupee figure on every tenant.**
 
 <p>
   <img alt="Kubernetes" src="https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white">
   <img alt="KEDA" src="https://img.shields.io/badge/KEDA-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white">
   <img alt="Go" src="https://img.shields.io/badge/Go%201.25-00ADD8?style=for-the-badge&logo=go&logoColor=white">
   <img alt="Prometheus" src="https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white">
-  <img alt="Terraform" src="https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white">
-  <img alt="Argo CD" src="https://img.shields.io/badge/Argo%20CD-EF7B4D?style=for-the-badge&logo=argo&logoColor=white">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white">
+  <img alt="Helm" src="https://img.shields.io/badge/Helm-0F1689?style=for-the-badge&logo=helm&logoColor=white">
 </p>
 
-<img src="docs/architecture-aws.png" width="94%" alt="Target architecture: tenants reach an ingress, requests are tagged with a tenant id and a latency class, a token gateway enforces per-tenant model budgets with a semantic cache, KEDA scales both application tiers to zero, priority classes keep batch work from delaying interactive requests, and a cost meter attributes spend per tenant.">
-
-<sub><b>Target architecture on AWS.</b> The panel at the bottom of the diagram maps every managed service to the zero-cost component this project actually runs.</sub>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.svg">
+  <img src="docs/architecture-light.svg" width="100%" alt="Three merchants share one Kubernetes cluster behind a Host-routed ingress. A five-stage control plane tags each request with a tenant and latency class, meters model tokens, scales workers to zero, separates interactive from batch work, and attributes cost per tenant. Each tenant has its own namespace with an API and a worker, backed by a shared Redis and a PostgreSQL schema per tenant.">
+</picture>
 
 </div>
 
 ---
 
-> **Status — in development.** Built as the laboratory project for Cloud Computing Methodologies at VIT Vellore. The
-> repository is public from day one so the work is visible as it happens. Results tables below are empty until the
-> experiments in `experiments/` have actually been run — nothing here is claimed before it is measured.
-
 ## The problem
 
-A web application serving several customers from one deployment has a cost structure container orchestration was not
-designed for:
+One application serving several customers from one cluster has a cost structure that container
+orchestration was not designed for:
 
 | # | Problem | Why the platform does not solve it |
 | --- | --- | --- |
-| **P1** | An idle tenant still costs money — every service stays resident whether the customer logs in or not. | A Kubernetes `Deployment` has a floor of one replica, and nothing in the default scheduler knows a tenant has had no traffic for eleven hours. |
-| **P2** | Model tokens dominate operating cost, and no tenant has a ceiling. | Periodic agent scans re-ask near-identical questions on a timer. Nothing de-duplicates semantically equivalent prompts, and nothing stops one tenant consuming the entire budget. |
+| **P1** | An idle tenant still costs money — every service stays resident whether the customer logs in or not. | A Kubernetes `Deployment` floors at one replica, and nothing in the default scheduler knows a tenant has had no traffic for eleven hours. |
+| **P2** | Model tokens dominate operating cost, and no tenant has a ceiling. | Periodic agents re-ask near-identical questions on a timer. Nothing de-duplicates semantically equivalent prompts, and nothing stops one tenant consuming the entire budget. |
 | **P3** | One tenant's batch job slows another tenant's interactive request. | Both are ordinary pods competing for the same CPU. Kubernetes has no notion that one has a user waiting and the other does not. |
 
 ## The control plane
 
-Five stages in the request path, and deliberately nothing else:
+Five stages in the request path, and deliberately nothing else.
 
 1. **Admission** — stamps every request with a tenant id and a latency class (`interactive` or `deferrable`).
-2. **Token gateway** — the only route to the model. Checks the tenant's remaining budget, serves semantically
-   equivalent prompts from a vector cache, and coalesces periodic scans into batched calls.
-3. **Elasticity** — drives KEDA from HTTP activity and queue depth, so a tenant with no traffic holds no pods.
-4. **Fair scheduling** — priority classes, so deferrable work yields rather than competing.
-5. **Cost meter** — joins CPU-seconds, tokens and stored bytes into one rupee figure per tenant per month.
-
-## Claims this repository sets out to demonstrate
-
-| | Claim | Evidence |
-| --- | --- | --- |
-| **C1** | Scale-to-zero reduces a tenant's idle cost to approximately zero, at a bounded and measurable cold-start penalty. | _pending_ |
-| **C2** | Per-tenant token budgets, semantic caching and scan batching cut model spend substantially, with no loss of answer quality on a fixed question set. | _pending_ |
-| **C3** | Class separation holds the interactive latency objective under heavy batch load, and cost per tenant falls with tenant density up to a locatable limit. | _pending_ |
+2. **Token gateway** — the only route to the model. Checks the tenant's remaining budget, serves
+   near-duplicate prompts from a per-tenant cache, and collapses identical concurrent prompts into one call.
+3. **Elasticity** — KEDA reads each tenant's own queue depth, so a tenant with no traffic holds no pods.
+4. **Fair scheduling** — priority classes *and* CPU shares, so deferrable work yields rather than competing.
+5. **Cost meter** — joins CPU-seconds, tokens and stored bytes into one rupee figure per tenant.
 
 ## Results
 
-Regenerated from raw run data by `make report`. Empty until the experiment campaign runs.
+Measured on a three-node k3d cluster, three tenants. Raw output is committed under
+[`experiments/raw/`](experiments/raw/) — a result whose data is absent is a claim, not a finding.
 
-| Metric | Baseline (one deployment per tenant) | With the control plane |
+### C1 · Scale-to-zero
+
+Workers reach **0 replicas** when a tenant is idle. Cold start, timed from job acceptance to queue drained,
+6 trials per configuration:
+
+| KEDA `pollingInterval` | median | worst |
 | --- | --- | --- |
-| ₹ per tenant per month | _pending_ | _pending_ |
-| Idle cost per tenant | _pending_ | _pending_ |
-| Cold-start p95 | — | _pending_ |
-| Token spend per tenant | _pending_ | _pending_ |
-| Semantic cache hit rate | — | _pending_ |
-| Interactive p95 under batch load | _pending_ | _pending_ |
-| Tenants per node at SLO | _pending_ | _pending_ |
+| 1 s | **3.70 s** | 5.11 s |
+| 5 s | **6.01 s** | 14.34 s |
+
+**The penalty is dominated by the scaler's polling interval, not container startup.** Detection delay is
+uniform in `[0, P]` with mean `P/2`, predicting a 2.00 s median difference between these settings; the
+measured difference is **2.31 s**. Container start is negligible because the image is 15 MB and a Go binary
+starts in milliseconds — which makes the cold-start cost a parameter the operator chooses rather than a
+fixed price of scale-to-zero.
+
+### C2 · Token spend
+
+A repeated question costs **zero tokens** and returns in ~30 ms instead of ~900 ms. Twenty concurrent
+identical prompts collapse to **one** upstream call — the case a cache structurally cannot solve, because a
+cache only helps after the first answer returns.
+
+**An honest negative result.** The local lexical embedder scores a *paraphrase* pair at **0.219** and a
+*materially different* pair at **0.794** — it ranks the pair that must not merge four times above the pair
+that should. No threshold separates them, because the two questions share nearly every word and differ in
+the one term carrying the meaning. The cache is therefore configured conservatively: it collapses
+near-identical prompts and never answers the wrong question. Paraphrase collapse needs a semantic embedding
+model and is stated as future work rather than claimed.
+
+### C3 · Noisy neighbour — partially supported
+
+Victim workload identical in all three phases; only the neighbour and the scheduling configuration change.
+
+| phase | p50 | p95 | p99 |
+| --- | --- | --- | --- |
+| quiet | 6.5 ms | 26.9 ms | 29.0 ms |
+| unprotected | 28.6 ms | **75.2 ms** | 123.7 ms |
+| protected | 28.0 ms | **61.4 ms** | 96.5 ms |
+
+Contention is real — p95 degrades 2.8×. Priority classes recover **18% of p95 and 22% of p99**, but do
+**not** restore the baseline. C3 as written says class separation *holds* the objective; it does not, it
+improves it. Both loaded phases stayed under the 400 ms objective, but that is headroom, not the mechanism
+succeeding.
+
+Three caveats are recorded in [`experiments/raw/README.md`](experiments/raw/README.md) rather than dropped:
+the degradation is not cleanly attributable to worker CPU alone, KEDA never reached its replica ceiling
+because the HPA rate-limits scale-up, and a first attempt measured nothing at all because the node had
+12 allocatable CPUs and the tenant quota capped the workers before KEDA got a say.
+
+## The architectural claim, and how it is enforced
+
+The control plane is **application-agnostic**. It keys off an HTTP header, a path classification and a queue
+depth, and knows nothing about what the application does.
+
+That is checked, not asserted. [`TestControlPlaneDoesNotImportWorkload`](controlplane/boundary_test.go)
+parses every file under `controlplane/` and fails the build if any of them imports `workload/`. It was
+verified against a deliberate violation to confirm it fails rather than passing vacuously, and it refuses to
+pass if the walk finds no files.
+
+It has also been demonstrated the hard way. The original workload was a **gauge repeatability-and-reproducibility
+tool for manufacturing**. It is now an **online shop** — catalogue search, an LLM shopping assistant, and a
+CPU-bound "related products" rebuild. Not one line of `controlplane/` changed.
+
+Because `controlplane/` sits outside Go's import-restricted `internal/` directory, another module can import
+it directly: the reusability claim is enforced by the compiler, not just described here.
+
+### Swapping in your own application
+
+1. Send `X-Tenant` on every request, and list deferrable routes in `controlplane/admission`.
+2. Wrap handlers as `admission.Middleware(obs.Middleware(h))`, so latency is labelled by tenant and class.
+3. Reach the model only through `controlplane/model.Client`, and enqueue deferrable work through
+   `controlplane/queue`.
+
+## Tenant isolation
+
+Three enforced layers, not one.
+
+| Layer | Mechanism | What it stops |
+| --- | --- | --- |
+| Network | `NetworkPolicy`, default-deny ingress | tenant-b reaching tenant-a's API — verified by deleting the policy and watching the same request succeed |
+| Data | One PostgreSQL schema *and role* per tenant | cross-schema reads; the role holds no grant on anyone else's data |
+| Compute | `ResourceQuota` + `LimitRange` per namespace | one tenant consuming the cluster — 12 requested replicas against a 1-CPU quota yielded 2 |
+| Model | Cache and coalescer keyed by tenant | one merchant's cached answer reaching another |
 
 ## Repository layout
 
 ```text
-workload/            the demonstration application - small, frozen, REPLACEABLE
-  api/               Go: /products (search), /ask (assistant), /reindex (enqueue -> 202)
-  api/ui/            a single-page storefront, served at /shop
+workload/            the demonstration application — small, frozen, REPLACEABLE
+  api/               /products (search), /ask (assistant), /reindex (enqueue → 202)
+  api/ui/            single-page storefront, served at /shop
   worker/            queue consumer, one per tenant, blocks rather than polls
-  catalogue/         the domain surface - TF-IDF similarity over a product catalogue
+  catalogue/         domain surface — TF-IDF similarity over a product catalogue
   store/             per-tenant Postgres schema: products, related_products, runs
-controlplane/        the deliverable - application-agnostic
+controlplane/        the deliverable — application-agnostic
   admission/         tenant id + latency-class tagging
   queue/             one Redis list per tenant; the key KEDA scales on
-  model/             the only boundary to the language model (stub or Gemini)
-  gateway/           per-tenant token budget, semantic cache, prompt coalescing
+  model/             the only boundary to the model — Gloo, Gemini, stub, fallback
+  gateway/           per-tenant budget, semantic cache, prompt coalescing
   obs/               histograms whose buckets put the SLO on an exact edge
-  scaler/  costmeter/                                            (Module 9)
+  boundary_test.go   fails the build if this package ever imports the workload
 deploy/
-  charts/tenant/     one Helm release per customer: namespace, quota,
-                     NetworkPolicies, ingress, ScaledObject, schema provisioning
-  k8s/platform/      shared Redis and Postgres - the only always-on components
+  charts/tenant/     one Helm release per customer: namespace, quota, NetworkPolicies,
+                     ingress, ScaledObject, schema + role provisioning
+  k8s/platform/      shared Redis and Postgres — the only always-on components
   k8s/monitoring/    kube-prometheus-stack values and scrape monitors
   k8s/scheduling/    PriorityClasses
-  terraform/ argocd/                                             (Module 11)
+  vm-install.sh      one command from a bare Ubuntu VM to the full stack
 experiments/
   tenants.py         shift-shaped multi-tenant load model (Locust)
-  coldstart.py       E1 - cold-start penalty, claim C1
-  noisyneighbour.py  E3 - interference under load, claim C3
-  questions.yaml     fixed question set for cache answer quality
-  raw/               committed raw output - the evidence behind every figure
+  coldstart.py       E1 — cold-start penalty, claim C1
+  noisyneighbour.py  E3 — interference under load, claim C3
+  raw/               committed raw output — the evidence behind every number
 ```
-
-### Swapping the workload — already done once
-
-`workload/` is a stand-in, not a commitment, and it has been replaced in anger to prove it. The
-original demonstration application was a gauge repeatability-and-reproducibility tool for
-manufacturing. It is now an online shop: catalogue search, an LLM shopping assistant, and a
-CPU-bound "related products" rebuild.
-
-**Not one line of `controlplane/` changed.** The same admission tagging, per-tenant queue, token
-gateway, autoscaler and priority classes govern a storefront exactly as they governed a
-measurement-systems tool. Any LLM-backed web application can take the same place.
-
-That is only credible because the dependency runs one way: **nothing in `controlplane/` imports
-anything from `workload/`**, and `TestControlPlaneDoesNotImportWorkload` enforces it on every CI
-run rather than trusting a convention. To put a different application under the same control plane,
-satisfy three contracts:
-
-1. Send `X-Tenant` on every request, and list deferrable routes in `controlplane/admission`.
-2. Wrap handlers as `admission.Middleware(obs.Middleware(h))`, so latency is labelled by tenant
-   and latency class.
-3. Reach the model only through `controlplane/model.Client`, and enqueue deferrable work through
-   `controlplane/queue`.
-
-Because `controlplane/` sits outside Go's import-restricted `internal/` directory, another module
-can import it directly - the reusability claim is enforced by the compiler, not just asserted here.
-
 
 ## Running it
 
-Requires Docker, `kubectl`, `k3d`, `helm`, Go 1.25 and Python 3.12 (experiments only). Nothing in this project needs a cloud account or a
-payment method.
+Needs Docker, `kubectl`, `k3d`, `helm` and Go 1.25. No cloud account, no payment method.
 
 ```bash
-make up          # k3d cluster + workload + Prometheus/Grafana
-make load        # drive the shift-shaped multi-tenant workload
-make experiment  # run the E1-E7 matrix into experiments/raw/
-make report      # regenerate every figure from raw data
-make down        # destroy the cluster
+make up          # k3d cluster, kubeconfig repair, nodes ready
+make monitoring  # kube-prometheus-stack + scrape monitors
+make deploy      # Redis, Postgres, images, three tenants
 ```
+
+Then open `http://tenant-a.localhost:8080/shop`. Onboarding a fourth customer is one command:
+
+```bash
+helm install tenant-d deploy/charts/tenant --set tenant=tenant-d --set tier=premium
+```
+
+Offboarding is `helm uninstall tenant-d` — the namespace goes and cascades to everything inside it.
+
+### On a public VM
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/krizz711/multitenant-saas-on-kubernetes/main/deploy/vm-install.sh | sudo bash
+```
+
+Installs k3s, Helm, KEDA and all three tenants, **builds the images natively** so x86 and arm64 both work,
+and derives per-tenant hostnames from `nip.io` so no domain or DNS record is required.
 
 ## Why it runs on nothing
 
 | Managed service | What this project runs instead |
 | --- | --- |
-| Amazon EKS | k3s on an always-free VM, k3d locally |
+| Amazon EKS | k3s on a free-tier VM; k3d locally |
 | ALB + Route 53 | Traefik ingress on the node |
-| Aurora PostgreSQL | Postgres pod, one schema per tenant |
-| ElastiCache + SQS | one Redis pod — cache and queue |
-| Amazon Bedrock | Gemini free tier, behind the same gateway |
-| Managed Prometheus / Grafana | self-hosted Prometheus + Grafana |
-| Amazon ECR | GHCR, free for public images |
+| Aurora PostgreSQL | Postgres pod, one schema and role per tenant |
+| ElastiCache + SQS | one Redis pod — cache and queue, AOF persisted |
+| Amazon Bedrock | Gloo or Gemini, behind the same gateway |
+| Managed Prometheus / Grafana | self-hosted kube-prometheus-stack |
 | Cost Explorer + allocation tags | PromQL recording rules, per tenant |
 
-The AWS diagram above is the **target** architecture, not deployed infrastructure. Everything measured in this
-repository runs on the right-hand column.
+The Kubernetes API k3s exposes is the one EKS exposes, so every manifest, quota, network policy and
+autoscaler config here is byte-identical on a managed cluster. Moving this to EKS changes how the cluster is
+*provisioned*, not one line of the control plane — which is the point: a managed control plane bills
+continuously whether workloads run or not, and that is the cost model this project argues against.
+
+## Known limitations
+
+Stated here rather than discovered by a reader.
+
+- **The semantic cache is lexical, not semantic.** Measured above; paraphrases are not collapsed.
+- **C3 is partially supported.** Priority classes improve the tail by 18%; they do not hold the objective.
+- **The model is stubbed during experiments, deliberately.** A rate-limited hosted dependency in the request
+  path would contaminate every latency number. Hosted providers are used for demonstrations, and are wrapped
+  so an unreachable provider degrades to a local answer rather than returning 502.
+- **Cost attribution is partial.** CPU-seconds, tokens and per-schema storage are measured; joining them into
+  a single rupee figure is the next piece of work.
 
 ## Motivation
 
-The three problems above were found in a real system: [Quality-AI-Intelligence](https://github.com/krizz711/Quality-AI-Intelligence),
-a multi-agent manufacturing quality platform that ships as a twelve-service Docker Compose stack, re-analyses every
-active measurement series through a language model every thirty seconds, and runs CPU-heavy gauge studies alongside
-an interactive dashboard. Pointing this control plane at it is future work — deliberately, so that no result here
-depends on migrating a large application first.
+The three problems were found in a real system:
+[Quality-AI-Intelligence](https://github.com/krizz711/Quality-AI-Intelligence), a multi-agent manufacturing
+quality platform that ships as a twelve-service stack, re-analyses every active measurement series through a
+language model every thirty seconds, and runs CPU-heavy gauge studies alongside an interactive dashboard.
+Pointing this control plane at it is future work — deliberately, so that no result here depends on migrating
+a large application first.
 
 ## Licence
 

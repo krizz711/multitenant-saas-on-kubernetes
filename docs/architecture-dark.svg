@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="812" viewBox="0 0 1180 812" role="img" aria-label="Architecture of a multi-tenant cost and SLO aware control plane on Kubernetes">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9198a1"/></marker>
+<marker id="arrowp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/></marker>
+</defs>
+<rect width="1180" height="812" fill="#0d1117"/>
+<text x="60" y="44" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="700" text-anchor="start">THREE MERCHANTS, ONE CLUSTER</text>
+<rect x="60" y="58" width="300" height="62" rx="10" fill="#1d1427" stroke="#bc8cff" stroke-width="1.5"/>
+<text x="76" y="82" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="700" text-anchor="start">Merchant A</text>
+<text x="76" y="102" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" text-anchor="start">electronics · standard tier</text>
+<line x1="210" y1="120" x2="210" y2="152" stroke="#9198a1" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="440" y="58" width="300" height="62" rx="10" fill="#1d1427" stroke="#bc8cff" stroke-width="1.5"/>
+<text x="456" y="82" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="700" text-anchor="start">Merchant B</text>
+<text x="456" y="102" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" text-anchor="start">outdoor gear · premium tier</text>
+<line x1="590" y1="120" x2="590" y2="152" stroke="#9198a1" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="820" y="58" width="300" height="62" rx="10" fill="#1d1427" stroke="#bc8cff" stroke-width="1.5"/>
+<text x="836" y="82" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="700" text-anchor="start">Merchant C</text>
+<text x="836" y="102" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" text-anchor="start">homeware · standard tier</text>
+<line x1="970" y1="120" x2="970" y2="152" stroke="#9198a1" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="60" y="154" width="1060" height="54" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="80" y="178" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="700" text-anchor="start">Traefik Ingress</text>
+<text x="80" y="196" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5" font-weight="400" text-anchor="start">routes by Host header — the hostname decides whose namespace the request enters</text>
+<text x="1100" y="184" fill="#9198a1" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="11" font-weight="400" text-anchor="end">tenant-*.example</text>
+<line x1="590" y1="208" x2="590" y2="240" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#arrowp)"/>
+<rect x="60" y="242" width="1060" height="196" rx="12" fill="#121d2f" stroke="#58a6ff" stroke-width="2"/>
+<text x="80" y="268" fill="#58a6ff" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="700" text-anchor="start">CONTROL PLANE</text>
+<text x="80" y="288" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11.5" font-weight="400" text-anchor="start">application-agnostic · a CI test fails the build if it ever imports the workload</text>
+<rect x="80" y="306" width="192" height="112" rx="9" fill="#0d1117" stroke="#58a6ff" stroke-width="1.3"/>
+<text x="93" y="330" fill="#58a6ff" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">1  Admission</text>
+<text x="93" y="352" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">tags every request with a</text>
+<text x="93" y="367" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">tenant id and a latency class</text>
+<text x="93" y="402" fill="#9198a1" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10" font-weight="700" text-anchor="start">interactive | deferrable</text>
+<line x1="273" y1="362" x2="283" y2="362" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#arrowp)"/>
+<rect x="285" y="306" width="192" height="112" rx="9" fill="#0d1117" stroke="#58a6ff" stroke-width="1.3"/>
+<text x="298" y="330" fill="#58a6ff" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">2  Token gateway</text>
+<text x="298" y="352" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">per-tenant budget, semantic</text>
+<text x="298" y="367" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">cache, prompt coalescing</text>
+<text x="298" y="402" fill="#9198a1" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10" font-weight="700" text-anchor="start">claim C2</text>
+<line x1="478" y1="362" x2="488" y2="362" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#arrowp)"/>
+<rect x="490" y="306" width="192" height="112" rx="9" fill="#0d1117" stroke="#58a6ff" stroke-width="1.3"/>
+<text x="503" y="330" fill="#58a6ff" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">3  Elasticity</text>
+<text x="503" y="352" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">KEDA scales each tenant's</text>
+<text x="503" y="367" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">workers to zero when idle</text>
+<text x="503" y="402" fill="#9198a1" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10" font-weight="700" text-anchor="start">claim C1</text>
+<line x1="683" y1="362" x2="693" y2="362" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#arrowp)"/>
+<rect x="695" y="306" width="192" height="112" rx="9" fill="#0d1117" stroke="#58a6ff" stroke-width="1.3"/>
+<text x="708" y="330" fill="#58a6ff" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">4  Fair scheduling</text>
+<text x="708" y="352" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">PriorityClass + CPU shares</text>
+<text x="708" y="367" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">so batch yields to interactive</text>
+<text x="708" y="402" fill="#9198a1" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10" font-weight="700" text-anchor="start">claim C3</text>
+<line x1="888" y1="362" x2="898" y2="362" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#arrowp)"/>
+<rect x="900" y="306" width="192" height="112" rx="9" fill="#0d1117" stroke="#58a6ff" stroke-width="1.3"/>
+<text x="913" y="330" fill="#58a6ff" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">5  Cost meter</text>
+<text x="913" y="352" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">CPU-seconds + tokens + bytes</text>
+<text x="913" y="367" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.8" font-weight="400" text-anchor="start">joined per tenant</text>
+<text x="913" y="402" fill="#9198a1" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10" font-weight="700" text-anchor="start">₹ per tenant</text>
+<line x1="590" y1="438" x2="590" y2="470" stroke="#58a6ff" stroke-width="1.8" marker-end="url(#arrowp)"/>
+<text x="60" y="462" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="700" text-anchor="start">WORKLOAD — small, frozen, REPLACEABLE  (was a manufacturing tool; swapped for a shop, control plane unchanged)</text>
+<rect x="60" y="472" width="300" height="128" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="76" y="495" fill="#9198a1" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10.5" font-weight="700" text-anchor="start">tenant namespace</text>
+<rect x="76" y="504" width="128" height="42" rx="7" fill="#0f2417" stroke="#3fb950" stroke-width="1.2"/>
+<text x="86" y="522" fill="#3fb950" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">api</text>
+<text x="86" y="537" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">search · ask</text>
+<rect x="216" y="504" width="128" height="42" rx="7" fill="#2b1a0e" stroke="#ff9a52" stroke-width="1.2"/>
+<text x="226" y="522" fill="#ff9a52" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">worker</text>
+<text x="226" y="537" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">reindex · 0..N</text>
+<text x="76" y="568" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">ResourceQuota · LimitRange</text>
+<text x="76" y="584" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">NetworkPolicy: default-deny</text>
+<line x1="210" y1="600" x2="210" y2="638" stroke="#9198a1" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="440" y="472" width="300" height="128" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="456" y="495" fill="#9198a1" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10.5" font-weight="700" text-anchor="start">tenant namespace</text>
+<rect x="456" y="504" width="128" height="42" rx="7" fill="#0f2417" stroke="#3fb950" stroke-width="1.2"/>
+<text x="466" y="522" fill="#3fb950" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">api</text>
+<text x="466" y="537" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">search · ask</text>
+<rect x="596" y="504" width="128" height="42" rx="7" fill="#2b1a0e" stroke="#ff9a52" stroke-width="1.2"/>
+<text x="606" y="522" fill="#ff9a52" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">worker</text>
+<text x="606" y="537" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">reindex · 0..N</text>
+<text x="456" y="568" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">ResourceQuota · LimitRange</text>
+<text x="456" y="584" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">NetworkPolicy: default-deny</text>
+<line x1="590" y1="600" x2="590" y2="638" stroke="#9198a1" stroke-width="1.8" marker-end="url(#arrow)"/>
+<rect x="820" y="472" width="300" height="128" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="836" y="495" fill="#9198a1" font-family="ui-monospace,SFMono-Regular,Consolas,monospace" font-size="10.5" font-weight="700" text-anchor="start">tenant namespace</text>
+<rect x="836" y="504" width="128" height="42" rx="7" fill="#0f2417" stroke="#3fb950" stroke-width="1.2"/>
+<text x="846" y="522" fill="#3fb950" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">api</text>
+<text x="846" y="537" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">search · ask</text>
+<rect x="976" y="504" width="128" height="42" rx="7" fill="#2b1a0e" stroke="#ff9a52" stroke-width="1.2"/>
+<text x="986" y="522" fill="#ff9a52" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">worker</text>
+<text x="986" y="537" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">reindex · 0..N</text>
+<text x="836" y="568" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">ResourceQuota · LimitRange</text>
+<text x="836" y="584" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">NetworkPolicy: default-deny</text>
+<line x1="970" y1="600" x2="970" y2="638" stroke="#9198a1" stroke-width="1.8" marker-end="url(#arrow)"/>
+<text x="60" y="632" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="700" text-anchor="start">ALWAYS-ON PLATFORM — the only components that never scale to zero</text>
+<rect x="60" y="640" width="300" height="68" rx="10" fill="#1c2128" stroke="#30363d" stroke-width="1.5"/>
+<text x="76" y="664" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="700" text-anchor="start">Redis</text>
+<text x="76" y="682" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">per-tenant job queue (the key KEDA reads)</text>
+<text x="76" y="696" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">·  semantic cache  ·  AOF persisted</text>
+<rect x="440" y="640" width="300" height="68" rx="10" fill="#1c2128" stroke="#30363d" stroke-width="1.5"/>
+<text x="456" y="664" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="700" text-anchor="start">PostgreSQL</text>
+<text x="456" y="682" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">one schema per tenant, one role per tenant</text>
+<text x="456" y="696" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">·  isolation enforced by the database</text>
+<rect x="820" y="640" width="300" height="68" rx="10" fill="#1c2128" stroke="#30363d" stroke-width="1.5"/>
+<text x="836" y="664" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="700" text-anchor="start">Prometheus + Grafana</text>
+<text x="836" y="682" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">per-tenant latency histograms  ·  SLO on</text>
+<text x="836" y="696" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" text-anchor="start">an exact bucket edge</text>
+<rect x="820" y="242" width="300" height="0.1" rx="10" fill="#0d1117" stroke="#0d1117" stroke-width="1.5"/>
+<rect x="60" y="726" width="1060" height="58" rx="10" fill="#0d1117" stroke="#30363d" stroke-width="1.3" stroke-dasharray="5 4"/>
+<text x="80" y="750" fill="#e6edf3" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="700" text-anchor="start">Model providers</text>
+<text x="80" y="768" fill="#9198a1" font-family="ui-sans-serif,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="10.5" font-weight="400" text-anchor="start">Gloo · Gemini · deterministic stub — selected by one environment variable. The gateway, budget, cache, coalescer and every metric are indifferent to which is behind them.</text>
+</svg>
