@@ -174,15 +174,27 @@ say "8/8 publishing ports"
 # meets a GitHub login wall instead of a shop. Public is what makes the URL
 # openable from any machine. If the CLI token lacks the scope, the Ports
 # panel does the same job by hand.
-if [ -n "${CODESPACE_NAME:-}" ] && command -v gh >/dev/null 2>&1; then
-  if gh codespace ports visibility 8081:public 8082:public 8083:public \
+PUBLISHED=no
+if [ -z "${CODESPACE_NAME:-}" ]; then
+  echo "   not inside a Codespace, nothing to publish"
+  PUBLISHED=n/a
+elif ! command -v gh >/dev/null 2>&1; then
+  # This branch used to be folded into the condition, so a missing gh skipped
+  # the whole step in silence and the banner below still printed URLs that
+  # could not work. Say so instead.
+  printf '   \033[1;33mthe gh CLI is not installed, so the ports are still PRIVATE\033[0m\n'
+elif gh codespace ports visibility 8081:public 8082:public 8083:public \
        -c "$CODESPACE_NAME" >/dev/null 2>&1; then
-    echo "   8081, 8082, 8083 are public"
-  else
-    printf '   \033[1;33mcould not set visibility from the CLI.\033[0m\n'
-    printf '   Open the PORTS panel, right-click each of 8081-8083,\n'
-    printf '   then Port Visibility -> Public.\n'
-  fi
+  echo "   8081, 8082, 8083 are public"
+  PUBLISHED=yes
+else
+  printf '   \033[1;33mthe gh CLI could not set visibility\033[0m\n'
+fi
+
+if [ "$PUBLISHED" = "no" ]; then
+  printf '   Open the PORTS panel, right-click each of 8081-8083, then\n'
+  printf '   Port Visibility -> Public. Until you do, the URLs below will\n'
+  printf '   not resolve from another machine.\n'
 fi
 
 say "VERIFY"

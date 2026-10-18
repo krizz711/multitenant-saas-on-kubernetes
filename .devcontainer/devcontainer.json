@@ -9,8 +9,13 @@
   // k3d runs k3s inside Docker, so the Codespace needs a Docker daemon of its
   // own. k3s installed directly would want systemd and a privileged host,
   // which a Codespace is not.
+  // github-cli is not optional furniture: codespaces-install.sh uses `gh` to
+  // flip ports 8081-8083 to public, and Codespaces forwards them privately by
+  // default. Without it the shops answer correctly inside the container and
+  // are unreachable from anywhere else.
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
 
   // Asking for 4 cores is not comfort. On the 2-core default the pod requests
