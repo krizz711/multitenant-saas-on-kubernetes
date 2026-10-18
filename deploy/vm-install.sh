@@ -8,6 +8,13 @@
 #
 #   sudo bash deploy/vm-install.sh
 #
+# To wire up the hosted model rather than the local stub, pass the credentials
+# through the environment. Use `read -s` so they never enter shell history:
+#
+#   read -rsp 'client id: '     GLOO_CLIENT_ID     && echo
+#   read -rsp 'client secret: ' GLOO_CLIENT_SECRET && echo
+#   sudo -E bash deploy/vm-install.sh
+#
 # Works on x86_64 and arm64 without changes: the container images are built ON
 # the VM, natively. Cross-compiling from a laptop to an Oracle Ampere instance
 # is the usual way an afternoon disappears, and building in place removes the
@@ -88,15 +95,55 @@ helm repo update >/dev/null 2>&1
 helm upgrade --install keda kedacore/keda -n keda --create-namespace --wait --timeout 10m >/dev/null
 
 say "7/7 merchants"
+
+# The chart wants the NAME of a Secret, not a credential. Naming one here and
+# creating it below is deliberate: the secretKeyRef is optional, so if the
+# Secret never appears the pod still starts and silently serves stub answers.
+# That is the worst failure this project can have, because the demonstration
+# still looks like it works. The verify step at the end reports the model each
+# tenant actually reached, so the fallback is visible.
+GLOO_SECRET_NAME=""
+if [ -n "${GLOO_CLIENT_ID:-}" ] && [ -n "${GLOO_CLIENT_SECRET:-}" ]; then
+  GLOO_SECRET_NAME="gloo-credentials"
+fi
+GEMINI_SECRET_NAME=""
+if [ -n "${GEMINI_API_KEY:-}" ]; then
+  GEMINI_SECRET_NAME="gemini-credentials"
+fi
+
 for t in a b c; do
   tier=standard; [ "$t" = "b" ] && tier=premium
   helm upgrade --install "tenant-$t" deploy/charts/tenant \
     --set "tenant=tenant-$t" --set "tier=$tier" \
     --set "baseDomain=${BASE_DOMAIN}" \
-    ${GLOO_SECRET:+--set glooSecret=$GLOO_SECRET} \
-    ${GEMINI_SECRET:+--set geminiSecret=$GEMINI_SECRET} >/dev/null
+    ${GLOO_SECRET_NAME:+--set glooSecret=$GLOO_SECRET_NAME} \
+    ${GEMINI_SECRET_NAME:+--set geminiSecret=$GEMINI_SECRET_NAME} >/dev/null
   echo "   tenant-$t ($tier)"
 done
+
+# After Helm, because Helm owns the namespace and creating it first makes the
+# install fail on a resource it does not think it owns. The API tolerates a
+# missing Secret, so the ordering costs nothing but a restart.
+if [ -n "$GLOO_SECRET_NAME" ] || [ -n "$GEMINI_SECRET_NAME" ]; then
+  say "model credentials"
+  for t in a b c; do
+    ns="tenant-$t"
+    if [ -n "$GLOO_SECRET_NAME" ]; then
+      kubectl -n "$ns" create secret generic "$GLOO_SECRET_NAME" \
+        --from-literal=clientId="$GLOO_CLIENT_ID" \
+        --from-literal=clientSecret="$GLOO_CLIENT_SECRET" \
+        --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+    fi
+    if [ -n "$GEMINI_SECRET_NAME" ]; then
+      kubectl -n "$ns" create secret generic "$GEMINI_SECRET_NAME" \
+        --from-literal=apiKey="$GEMINI_API_KEY" \
+        --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+    fi
+    kubectl -n "$ns" rollout restart deploy/api >/dev/null
+    echo "   $ns credentials installed"
+  done
+fi
+
 for t in a b c; do kubectl -n "tenant-$t" rollout status deploy/api --timeout=300s; done
 
 say "waiting for catalogues"
@@ -110,9 +157,19 @@ done
 
 say "VERIFY"
 for t in a b c; do
-  printf '   tenant-%s -> HTTP ' "$t"
+  printf '   tenant-%s products -> HTTP ' "$t"
   curl -s --max-time 15 -o /dev/null -w '%{http_code}\n' \
     -H "X-Tenant: tenant-$t" "http://tenant-$t.${BASE_DOMAIN}/products?limit=1"
+done
+
+# Which model actually answered. "stub" here means the credentials did not
+# reach the pod - the system is up, but claim C2 cannot be demonstrated on it.
+for t in a b c; do
+  printf '   tenant-%s model    -> ' "$t"
+  curl -s --max-time 90 -X POST -H "X-Tenant: tenant-$t" \
+    -H "Content-Type: application/json" -d '{"question":"what do you sell?"}' \
+    "http://tenant-$t.${BASE_DOMAIN}/ask" \
+    | sed -n 's/.*"model":"\([^"]*\)".*/\1/p' | head -1
 done
 
 cat <<BANNER
