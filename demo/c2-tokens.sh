@@ -9,14 +9,21 @@
 # is reproducible; otherwise the first ask would already be a hit.
 set -u
 Q="${1:-Which jacket works in heavy rain?}"
-BASE="http://localhost:8080/ask"
+# Both overridable so the same script runs against a public VM, where Traefik
+# listens on port 80 and the tenant hostnames hang off <IP>.nip.io rather than
+# .localhost. Routing is by Host header either way, so ENDPOINT can stay on the
+# loopback address and nothing has to resolve in DNS for this to work:
+#
+#   DOMAIN=1.2.3.4.nip.io ENDPOINT=http://localhost/ask bash demo/c2-tokens.sh
+DOMAIN="${DOMAIN:-localhost}"
+ENDPOINT="${ENDPOINT:-http://localhost:8080/ask}"
 
 ask() { # tenant -> "cached prompt output seconds"
   local t="$1"
   curl -s --max-time 120 -w ' %{time_total}' \
-    -H "Host: $t.localhost" -H "X-Tenant: $t" -H "Content-Type: application/json" \
+    -H "Host: $t.$DOMAIN" -H "X-Tenant: $t" -H "Content-Type: application/json" \
     -d "$(python -c 'import json,sys; print(json.dumps({"question": sys.argv[1]}))' "$Q")" \
-    "$BASE" | python -c '
+    "$ENDPOINT" | python -c '
 import json, sys
 body, _, secs = sys.stdin.read().rpartition(" ")
 d = json.loads(body)
