@@ -59,6 +59,12 @@ k3d image import multitenant/api:dev multitenant/worker:dev -c "$CLUSTER" >/dev/
 docker images --format '   {{.Repository}}:{{.Tag}}  {{.Size}}' | grep multitenant
 
 say "3/8 platform"
+# The platform namespace is declared inside redis.yaml, but `kubectl apply -f`
+# on a DIRECTORY applies its files in alphabetical order, so postgres.yaml is
+# attempted first and fails on a namespace that does not exist yet. Creating
+# it up front removes the dependency on filename ordering; redis.yaml then
+# re-declares it harmlessly.
+kubectl create namespace platform --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl apply -f deploy/k8s/platform/   >/dev/null
 kubectl apply -f deploy/k8s/scheduling/ >/dev/null
 kubectl -n platform rollout status deploy/redis    --timeout=300s
