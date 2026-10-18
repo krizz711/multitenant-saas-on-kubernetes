@@ -1,0 +1,46 @@
+{
+  "name": "multitenant-saas-on-kubernetes",
+
+  // Go on the host is only for `go vet` / `go test`. The container images are
+  // built by Docker from the repo's own Dockerfile, which pins its own
+  // toolchain, so this tag does not have to track go.mod exactly.
+  "image": "mcr.microsoft.com/devcontainers/go:1-bookworm",
+
+  // k3d runs k3s inside Docker, so the Codespace needs a Docker daemon of its
+  // own. k3s installed directly would want systemd and a privileged host,
+  // which a Codespace is not.
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  // Asking for 4 cores is not comfort. On the 2-core default the pod requests
+  // for three tenants plus Postgres, Redis, KEDA and the k3s system pods add
+  // up to more than the node can allocate, and pods sit Pending forever while
+  // looking like a deployment bug.
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "32gb"
+  },
+
+  // One port per tenant. These are the Host-rewriting front doors that
+  // codespaces-install.sh puts in front of Traefik, NOT the tenant pods -
+  // see the comment in that script for why that distinction decides whether
+  // claim C1 can be demonstrated at all.
+  "forwardPorts": [8081, 8082, 8083],
+  "portsAttributes": {
+    "8081": { "label": "tenant-a (electronics)",  "onAutoForward": "notify" },
+    "8082": { "label": "tenant-b (outdoor gear)", "onAutoForward": "notify" },
+    "8083": { "label": "tenant-c (homeware)",     "onAutoForward": "notify" }
+  },
+
+  // Tools only. The deployment itself is a separate, explicit command because
+  // it needs the model credentials passed in by hand.
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["golang.go", "ms-kubernetes-tools.vscode-kubernetes-tools"]
+    }
+  }
+}
