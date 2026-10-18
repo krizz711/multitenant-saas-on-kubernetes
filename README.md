@@ -26,6 +26,22 @@ Then put a rupee figure on every tenant.**
 
 ---
 
+## Live demo
+
+Three merchants on one cluster. Each is a separate tenant with its own namespace, catalogue, quota and token budget, reached through the same ingress:
+
+| Merchant | Shop |
+|---|---|
+| Merchant A · electronics · standard tier | [years-similar-ads-occasion.trycloudflare.com/shop](https://years-similar-ads-occasion.trycloudflare.com/shop) |
+| Merchant B · outdoor gear · premium tier | [wiring-overcome-replacing-studies.trycloudflare.com/shop](https://wiring-overcome-replacing-studies.trycloudflare.com/shop) |
+| Merchant C · homeware · standard tier | [format-relates-quad-reply.trycloudflare.com/shop](https://format-relates-quad-reply.trycloudflare.com/shop) |
+
+> **The links work only while the demo Codespace is running** (these were brought up on 19 October 2026). They are Cloudflare quick tunnels, which get a new random hostname every time they start, and a Codespace sleeps after 30 idle minutes. If a link is dead, [bring the demo back up](#in-a-github-codespace) with two commands; the new links are printed at the end.
+
+To see claim C2 working, ask Merchant B's assistant *"Which jacket works in heavy rain?"* and then ask it again. The first answer is a metered model call. The second comes from that tenant's cache in milliseconds and costs zero tokens.
+
+---
+
 ## The problem
 
 One application serving several customers from one cluster has a cost structure that container
@@ -193,6 +209,19 @@ curl -fsSL https://raw.githubusercontent.com/krizz711/multitenant-saas-on-kubern
 
 Installs k3s, Helm, KEDA and all three tenants, **builds the images natively** so x86 and arm64 both work,
 and derives per-tenant hostnames from `nip.io` so no domain or DNS record is required.
+
+### In a GitHub Codespace
+
+This is how the live demo above runs. It needs no card, no cloud account and no student verification. Go to **Code → Codespaces → Create codespace on main**, then in the Codespace terminal:
+
+```bash
+bash deploy/codespaces-install.sh   # cluster, images, KEDA, three tenants (about 10 minutes the first time)
+bash deploy/codespaces-tunnel.sh    # three public trycloudflare.com links, each checked end to end
+```
+
+Export `GLOO_CLIENT_ID` and `GLOO_CLIENT_SECRET` (or `GEMINI_API_KEY`) before the install if you want real model answers. Without them every tenant falls back to stub answers. The shops still look healthy, but claim C2 has nothing to measure.
+
+The tunnel step exists because some campus DNS resolvers refuse `*.app.github.dev`. On those networks the Codespace's own forwarded URLs fail with NXDOMAIN even though the ports are public and serving. The full walkthrough is in [`deploy/CODESPACES.md`](deploy/CODESPACES.md).
 
 ## Why it runs on nothing
 
