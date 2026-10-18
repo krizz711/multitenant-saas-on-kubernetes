@@ -94,11 +94,16 @@ kubectl apply -f deploy/k8s/scheduling/ >/dev/null
 kubectl -n platform rollout status deploy/redis    --timeout=300s
 kubectl -n platform rollout status deploy/postgres --timeout=600s
 
-helm repo add kedacore https://kedacore.github.io/charts >/dev/null 2>&1 || true
-helm repo update >/dev/null 2>&1
+# stdout stays quiet, but stderr is deliberately NOT swallowed here. Hiding it
+# meant a failed `helm repo update` printed nothing whatsoever and set -e ended
+# the whole run on a bare prompt, with the last line on screen being the step
+# banner. An installer that dies silently is worse than one that is noisy.
+helm repo add kedacore https://kedacore.github.io/charts >/dev/null || true
+helm repo update >/dev/null || die "helm repo update failed - its error is above"
 # KEDA must precede the tenant charts: they declare ScaledObjects, and Helm
 # refuses a manifest whose CRD does not exist yet.
-helm upgrade --install keda kedacore/keda -n keda --create-namespace --wait --timeout 10m >/dev/null
+helm upgrade --install keda kedacore/keda -n keda --create-namespace \
+  --wait --timeout 10m >/dev/null || die "KEDA install failed - its error is above"
 
 say "7/7 merchants"
 
