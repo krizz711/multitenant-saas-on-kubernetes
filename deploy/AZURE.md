@@ -31,14 +31,43 @@ sessions stops the meter entirely**, which stretches it much further.
 
 ## 1. Claim the credit
 
-Go to <https://azure.microsoft.com/free/students> and sign in with your VIT
-address (`…@vitstudent.ac.in`).
+**The VIT address is not the login.** Signing up with
+`…@vitstudent.ac.in` fails with *"You can't sign up with a work or school
+email"*, because that address already exists inside VIT's Microsoft tenant
+as a work/school identity and Microsoft will not create a second, personal
+account on top of it.
 
-You must be 18 or over and at an accredited institution. If the email is not
-recognised automatically, the fallback is to upload proof of enrolment — a
-dated student ID, enrolment letter or transcript. Both routes are
-legitimate; do not use a generated `.edu` address, which breaks Microsoft's
-terms and can lose you the account.
+Azure for Students uses two different identities, and conflating them is the
+single most common way to get stuck:
+
+| | Which address |
+|---|---|
+| **Sign in with** | a **personal** Microsoft account — Outlook, Hotmail, or one created on top of a Gmail address |
+| **Verify with** | the **VIT** address, typed into the academic verification box |
+
+So:
+
+1. Create or sign in to a personal Microsoft account at
+   <https://account.microsoft.com>. An existing Gmail address can be turned
+   into one; it does not have to be an `@outlook.com`.
+2. Go to <https://azure.microsoft.com/free/students> and sign in with
+   **that** account.
+3. When asked to confirm academic status, enter the **VIT** address. This is
+   verification only — it tells Microsoft where to send the confirmation,
+   and it is what the $100 is attached to.
+
+You must be 18 or over and at an accredited institution.
+
+**If the VIT domain is not recognised automatically**, two documented
+fallbacks:
+
+- **Verify with school documents** — upload a dated student ID, enrolment
+  letter or transcript.
+- **GitHub Student Developer Pack** — if that is already verified, it can
+  carry the academic status across, and it includes Azure credit of its own.
+
+Do not use a generated `.edu` address to get past verification. It breaks
+Microsoft's terms and can cost the account, taking the deployment with it.
 
 ## 2. An SSH key, on your laptop
 
