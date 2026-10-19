@@ -134,10 +134,13 @@ bash demo/c2-tokens.sh
 
 ## Caveats
 
-- **It stops after 30 idle minutes**, and the shops go with it. Restart the
-  Codespace and re-run `deploy/codespaces-install.sh` before a demo. The
-  cluster is reused if it survived, so a re-run is much faster than the first
-  install.
+- **It stops after 30 idle minutes**, and the shops and tunnels go with it.
+  Reopen the Codespace and run `bash deploy/codespaces-resume.sh`: it restarts
+  the cluster and the front doors, checks the model credentials are still
+  wired, and prints fresh public links. Do not re-run the installer without
+  credentials - `helm upgrade` would reset `glooSecret` and every tenant would
+  silently fall back to stub answers. The idle timeout can be raised to 240
+  minutes under github.com/settings/codespaces before a demo.
 - **The URL changes if you delete and recreate the Codespace.** It is derived
   from the Codespace name.
 - **Single node**, like the VM path, rather than the three-node k3d cluster

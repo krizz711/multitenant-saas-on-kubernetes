@@ -221,6 +221,8 @@ bash deploy/codespaces-tunnel.sh    # three public trycloudflare.com links, each
 
 Export `GLOO_CLIENT_ID` and `GLOO_CLIENT_SECRET` (or `GEMINI_API_KEY`) before the install if you want real model answers. Without them every tenant falls back to stub answers. The shops still look healthy, but claim C2 has nothing to measure.
 
+A Codespace stops after its idle timeout and the public links die with it. After reopening it, `bash deploy/codespaces-resume.sh` restarts the cluster and front doors without touching Helm, and prints fresh links.
+
 The tunnel step exists because some campus DNS resolvers refuse `*.app.github.dev`. On those networks the Codespace's own forwarded URLs fail with NXDOMAIN even though the ports are public and serving. The full walkthrough is in [`deploy/CODESPACES.md`](deploy/CODESPACES.md).
 
 ## Why it runs on nothing
